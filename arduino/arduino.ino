@@ -6,14 +6,9 @@
 // === POTENTIOMETERS ===
 static const uint8_t POT_COUNT     = 4;
 static const uint8_t potPins[POT_COUNT] = {A0, A1, A2, A3};
-static const uint8_t OVERSAMPLE    = 8;   // reads summed then averaged → keeps 0–1023 range
-static const uint8_t POT_THRESHOLD = 2;   // min change to transmit after EMA (post-filtered)
+static const uint8_t OVERSAMPLE    = 8;   // 8x averaging keeps 0–1023 range, kills ADC noise
+static const uint8_t POT_THRESHOLD = 5;   // raw units — well below 1dB (~14 raw), stops idle chatter
 
-// Integer fixed-point EMA: stored as value × 256
-// alpha = 1/4  →  new = old*(3/4) + sample*(1/4)
-// In fixed-point:  ema_fp = ema_fp - (ema_fp>>2) + (sample<<6)
-// Read back with:  ema_fp >> 8
-static int32_t emaFP[POT_COUNT];
 static int16_t lastPotValues[POT_COUNT];
 
 // === BUTTON MATRIX ===
@@ -29,7 +24,7 @@ static const uint16_t DEBOUNCE_MS = 18;
 static char msgBuf[12];
 
 // ---------------------------------------------------------------
-//  8× oversampling — sums 8 reads, right-shifts 3 → keeps 0–1023
+//  8× oversampling: sum 8 reads, right-shift 3 → stays in 0–1023
 // ---------------------------------------------------------------
 static inline int16_t oversampledRead(uint8_t pin) {
   int32_t sum = 0;
@@ -43,11 +38,8 @@ static inline int16_t oversampledRead(uint8_t pin) {
 void setup() {
   Serial.begin(115200);
 
-  // Seed EMA and last-values from real readings
   for (uint8_t i = 0; i < POT_COUNT; i++) {
-    int16_t v  = oversampledRead(potPins[i]);
-    emaFP[i]   = (int32_t)v << 8;   // initialise fixed-point store
-    lastPotValues[i] = v;
+    lastPotValues[i] = oversampledRead(potPins[i]);
   }
 
   for (uint8_t r = 0; r < NUM_ROWS; r++) {
@@ -60,16 +52,20 @@ void setup() {
 
   memset(lastState,     false, sizeof(lastState));
   memset(debounceTimer, 0,     sizeof(debounceTimer));
+
+  // Broadcast current pot positions so the host always knows the
+  // starting state — even after an Arduino reset mid-session.
+  delay(100);
+  for (uint8_t i = 0; i < POT_COUNT; i++) {
+    snprintf(msgBuf, sizeof(msgBuf), "P%u:%d", i, lastPotValues[i]);
+    Serial.println(msgBuf);
+  }
 }
 
 // ---------------------------------------------------------------
 static void scanPots() {
   for (uint8_t i = 0; i < POT_COUNT; i++) {
-    int16_t sample = oversampledRead(potPins[i]);
-
-    // Integer EMA  (alpha = 1/4)
-    emaFP[i] = emaFP[i] - (emaFP[i] >> 2) + ((int32_t)sample << 6);
-    int16_t val = (int16_t)(emaFP[i] >> 8);
+    int16_t val = constrain(oversampledRead(potPins[i]), 0, 1023);
 
     if (abs(val - lastPotValues[i]) > POT_THRESHOLD) {
       snprintf(msgBuf, sizeof(msgBuf), "P%u:%d", i, val);
