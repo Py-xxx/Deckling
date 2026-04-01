@@ -19,6 +19,20 @@ GAIN_MIN   = -60
 GAIN_MAX   =  12
 GAIN_RANGE = GAIN_MAX - GAIN_MIN   # 72
 
+# Potentiometer index (0–3, matching A0–A3 on Arduino) → Voicemeeter strip index.
+# Voicemeeter Banana strip layout:
+#   0 = Hardware Input 1
+#   1 = Hardware Input 2
+#   2 = Hardware Input 3
+#   3 = Virtual Input 1  (VAIO)
+#   4 = Virtual Input 2  (VAIO AUX)
+POT_TO_STRIP: dict[int, int] = {
+    0: 0,   # A0 → Hardware Input 1
+    1: 1,   # A1 → Hardware Input 2
+    2: 3,   # A2 → Virtual Input 1
+    3: 4,   # A3 → Virtual Input 2
+}
+
 # ================================================================
 #  BUTTON MAP
 # ================================================================
@@ -121,12 +135,13 @@ class StreamDeck:
 
     # ------------------------------------------------------------------
     def _handle_pot(self, pot_id: int, raw: int) -> None:
-        if not (0 <= pot_id <= 3):
+        strip_id = POT_TO_STRIP.get(pot_id)
+        if strip_id is None:
             return
         gain = raw_to_gain(raw)
         if gain == self._last_sent[pot_id]:
             return   # same 1 dB bucket — nothing to do
-        self._vm.strip[pot_id].gain = float(gain)
+        self._vm.strip[strip_id].gain = float(gain)
         self._last_sent[pot_id] = gain
 
     def _handle_button(self, btn_id: int) -> None:
