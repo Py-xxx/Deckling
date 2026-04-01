@@ -13,20 +13,18 @@ import voicemeeterlib
 # ================================================================
 #  CONFIG
 # ================================================================
-SERIAL_PORT = "COM3"        # change to match your Arduino's port
+SERIAL_PORT = "COM3"
 BAUD_RATE   = 115200
-SERIAL_TIMEOUT = 0.05       # seconds — short so the VM push-loop stays timely
 
 # Voicemeeter Banana gain range (dB)
 GAIN_MIN   = -60.0
 GAIN_MAX   =  12.0
 GAIN_RANGE = GAIN_MAX - GAIN_MIN   # 72.0
 
-# How often (seconds) we actually push a pending gain to Voicemeeter.
-# Voicemeeter's IPC can get overwhelmed if called hundreds of times per
-# second — rate-limiting to 30 Hz gives perfectly smooth fader movement
-# without spamming the API.
-VM_PUSH_INTERVAL = 1.0 / 30   # ~33 ms
+# Max rate we push pot values to Voicemeeter (Hz).
+# Flooding the IPC any faster doesn't improve smoothness and causes drops.
+VM_PUSH_HZ       = 60
+VM_PUSH_INTERVAL = 1.0 / VM_PUSH_HZ   # ~16.6 ms
 
 RECONNECT_ATTEMPTS = 30
 RECONNECT_DELAY_S  = 2.0
@@ -35,7 +33,7 @@ RECONNECT_DELAY_S  = 2.0
 #  BUTTON MAP
 # ================================================================
 BUTTON_ACTIONS: dict[int, str] = {
-    0:  "ctrl+alt+m",       # mute mic
+    0:  "ctrl+alt+m",
     1:  "ctrl+shift+s",
     2:  "alt+tab",
     3:  "ctrl+c",
@@ -45,9 +43,9 @@ BUTTON_ACTIONS: dict[int, str] = {
     7:  "play/pause media",
     8:  "next track",
     9:  "previous track",
-    10: "win+d",            # show desktop
-    11: "win+e",            # file explorer
-    12: "win+r",            # run dialog
+    10: "win+d",
+    11: "win+e",
+    12: "win+r",
     13: "ctrl+z",
     14: "ctrl+y",
     15: "f1",
@@ -61,25 +59,18 @@ BUTTON_ACTIONS: dict[int, str] = {
 #  HELPERS
 # ================================================================
 def raw_to_gain(raw: int) -> float:
-    """Map Arduino ADC value (0–1023) to Voicemeeter gain (-60 to +12 dB)."""
     return (raw / 1023.0) * GAIN_RANGE + GAIN_MIN
 
 
 def find_arduino_port() -> str | None:
-    """
-    Scan connected serial ports for a likely Arduino.
-    Falls back to SERIAL_PORT if none found.
-    """
     for port in serial.tools.list_ports.comports():
         desc = (port.description or "").lower()
         mfr  = (port.manufacturer or "").lower()
-        if "arduino" in desc or "arduino" in mfr or "ch340" in desc or "cp210" in desc:
+        if any(k in desc or k in mfr for k in ("arduino", "ch340", "cp210", "ftdi")):
             return port.device
     return None
 
 
-# ================================================================
-#  MAIN CLASS
 # ================================================================
 class StreamDeck:
     def __init__(self) -> None:
@@ -87,13 +78,13 @@ class StreamDeck:
         self._vm = voicemeeterlib.api("banana")
         self._vm.login()
 
-        # Rate-limited pot updates:
-        #   _pending_gain[i]  – latest target received from serial (None = no update)
-        #   _last_push[i]     – monotonic time of last VM API call for this channel
+        # Latest gain target per channel (None = no pending update)
         self._pending_gain: list[float | None] = [None] * 4
-        self._last_push:    list[float]         = [0.0]  * 4
+        # Timestamp of last VM push per channel
+        self._last_push: list[float] = [0.0] * 4
 
-        self._running = False
+        self._running  = False
+        self._line_buf = bytearray()
 
     # ------------------------------------------------------------------
     def _open_serial(self, port: str) -> bool:
@@ -102,31 +93,34 @@ class StreamDeck:
                 self._ser.close()
             self._ser = serial.Serial(
                 port, BAUD_RATE,
-                timeout=SERIAL_TIMEOUT,
+                timeout=0,           # non-blocking reads — we poll in_waiting ourselves
                 write_timeout=0,
+                dsrdtr=False,        # do NOT toggle DTR on open → stops Arduino resetting
+                rtscts=False,        # no hardware flow control
             )
+            # Let the Arduino (and Windows USB stack) finish initialising.
+            # Without this, the first read may catch mid-bootloader garbage.
+            time.sleep(1.5)
+            self._ser.reset_input_buffer()
+            self._line_buf.clear()
             return True
-        except serial.SerialException as exc:
+        except (serial.SerialException, OSError) as exc:
             print(f"  Serial open failed on {port}: {exc}")
             return False
 
     def _connect(self) -> bool:
-        """
-        Try the configured port first.  If that fails, scan for an Arduino.
-        Returns True once connected.
-        """
         if self._open_serial(SERIAL_PORT):
             return True
-
         found = find_arduino_port()
         if found:
-            print(f"  Found device on {found}, trying that instead…")
+            print(f"  Trying auto-detected port {found}…")
             if self._open_serial(found):
                 return True
-
         return False
 
     def _reconnect(self) -> bool:
+        # Brief pause so Windows fully releases the handle before we retry
+        time.sleep(0.5)
         for attempt in range(1, RECONNECT_ATTEMPTS + 1):
             print(f"Reconnecting ({attempt}/{RECONNECT_ATTEMPTS})…")
             if self._connect():
@@ -137,23 +131,17 @@ class StreamDeck:
 
     # ------------------------------------------------------------------
     def _push_pending_gains(self) -> None:
-        """
-        Push each channel's latest pending gain to Voicemeeter, but only
-        if enough time has elapsed since the last push for that channel.
-        This keeps the VM IPC healthy and the faders silky smooth.
-        """
         now = time.monotonic()
         for i in range(4):
             if self._pending_gain[i] is None:
                 continue
             if now - self._last_push[i] >= VM_PUSH_INTERVAL:
                 self._vm.strip[i].gain = round(self._pending_gain[i], 1)
-                self._last_push[i]     = now
-                self._pending_gain[i]  = None   # consumed; next serial msg will refill
+                self._last_push[i]    = now
+                self._pending_gain[i] = None
 
     def _handle_pot(self, pot_id: int, raw: int) -> None:
         if 0 <= pot_id <= 3:
-            # Just record the latest target — _push_pending_gains() applies it
             self._pending_gain[pot_id] = raw_to_gain(raw)
 
     def _handle_button(self, btn_id: int) -> None:
@@ -161,7 +149,6 @@ class StreamDeck:
         if action:
             keyboard.send(action)
 
-    # ------------------------------------------------------------------
     def _process_line(self, line: str) -> None:
         if len(line) < 3:
             return
@@ -172,17 +159,38 @@ class StreamDeck:
             val   = int(line[colon + 1:])
         except (ValueError, IndexError):
             return
-
         if kind == "P":
             self._handle_pot(id_, val)
         elif kind == "B" and val == 1:
             self._handle_button(id_)
 
     # ------------------------------------------------------------------
+    def _read_available(self) -> None:
+        """
+        Drain whatever bytes are waiting in the serial buffer right now.
+        Using in_waiting + non-blocking read avoids ever holding a pending
+        Windows async read operation open — that's what caused the
+        GetOverlappedResults / PermissionError 13 crash.
+        """
+        waiting = self._ser.in_waiting
+        if not waiting:
+            return
+
+        chunk = self._ser.read(waiting)
+        self._line_buf.extend(chunk)
+
+        # Parse out complete lines
+        while b"\n" in self._line_buf:
+            idx  = self._line_buf.index(b"\n")
+            line = self._line_buf[:idx].decode("ascii", errors="ignore").strip()
+            del self._line_buf[:idx + 1]
+            self._process_line(line)
+
+    # ------------------------------------------------------------------
     def run(self) -> None:
         print("Waiting for Arduino…")
         while not self._connect():
-            print(f"  Could not open {SERIAL_PORT}. Retrying in {RECONNECT_DELAY_S}s…")
+            print(f"  {SERIAL_PORT} not available, retrying in {RECONNECT_DELAY_S}s…")
             time.sleep(RECONNECT_DELAY_S)
 
         print(f"Connected to {self._ser.port} at {BAUD_RATE} baud.")
@@ -191,22 +199,20 @@ class StreamDeck:
         self._running = True
         try:
             while self._running:
-                # --- Read serial (non-blocking with short timeout) ---
                 try:
-                    raw = self._ser.readline()
-                except serial.SerialException as exc:
+                    self._read_available()
+                except (serial.SerialException, OSError) as exc:
                     print(f"\nSerial error: {exc}")
                     if not self._reconnect():
                         print("Could not reconnect. Exiting.")
                         break
                     continue
 
-                if raw:
-                    line = raw.decode("ascii", errors="ignore").strip()
-                    self._process_line(line)
-
-                # --- Push rate-limited gains every ~33 ms ---
                 self._push_pending_gains()
+
+                # Without a sleep here the loop would spin at 100% CPU when
+                # the pot is idle. 5 ms is short enough to not affect latency.
+                time.sleep(0.005)
 
         except KeyboardInterrupt:
             print("\nShutting down…")

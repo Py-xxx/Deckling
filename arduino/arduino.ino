@@ -7,7 +7,7 @@
 static const uint8_t POT_COUNT     = 4;
 static const uint8_t potPins[POT_COUNT] = {A0, A1, A2, A3};
 static const uint8_t OVERSAMPLE    = 8;   // reads summed then averaged → keeps 0–1023 range
-static const uint8_t POT_THRESHOLD = 5;   // min change to transmit after EMA (post-filtered)
+static const uint8_t POT_THRESHOLD = 2;   // min change to transmit after EMA (post-filtered)
 
 // Integer fixed-point EMA: stored as value × 256
 // alpha = 1/4  →  new = old*(3/4) + sample*(1/4)
