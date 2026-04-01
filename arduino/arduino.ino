@@ -38,6 +38,14 @@ static inline int16_t oversampledRead(uint8_t pin) {
 void setup() {
   Serial.begin(115200);
 
+  // Enable internal pull-ups on every analog pot pin.
+  // Unconnected pins will read a stable ~1023 (no delta, no serial traffic).
+  // When a real pot is wired in, its low impedance overrides the pull-up
+  // and the pin reads normally — no code change needed when adding pots.
+  for (uint8_t i = 0; i < POT_COUNT; i++) {
+    pinMode(potPins[i], INPUT_PULLUP);
+  }
+
   for (uint8_t i = 0; i < POT_COUNT; i++) {
     lastPotValues[i] = oversampledRead(potPins[i]);
   }
