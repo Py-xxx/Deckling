@@ -23,7 +23,11 @@
     "bundle": {
       "active": true,
       "identifier": "com.streamdeck.controller",
-      "icon": []
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/icon.ico"
+      ]
     },
     "security": { "csp": null },
     "windows": [
