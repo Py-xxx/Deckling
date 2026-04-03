@@ -1,1 +1,25 @@
+# Editor
 .vscode
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Node / Tauri frontend
+ui/node_modules/
+ui/dist/
+
+# Tauri build output
+ui/src-tauri/target/
+
+# User config (stored at ~/.streamdeck/config.json, not in repo)
+config.json
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db

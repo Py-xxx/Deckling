@@ -1,0 +1,118 @@
+import { useEffect, useRef, useState } from "react";
+import type { AppConfig } from "./types";
+import { loadConfig, saveConfig, getConfigPath } from "./configStore";
+import ProfileBar from "./components/ProfileBar";
+import ButtonGrid from "./components/ButtonGrid";
+import PotRow from "./components/PotRow";
+import KeybindModal from "./components/KeybindModal";
+import AdvancedSettings from "./components/AdvancedSettings";
+
+export default function App() {
+  const [config, setConfig] = useState<AppConfig | null>(null);
+  const [modalButtonId, setModalButtonId] = useState<number | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [configPath, setConfigPath] = useState<string>("");
+
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Initial load
+  useEffect(() => {
+    loadConfig().then((cfg) => setConfig(cfg));
+    getConfigPath().then((p) => setConfigPath(p));
+  }, []);
+
+  // Poll every 1500ms for external changes (Python daemon switching profiles)
+  useEffect(() => {
+    if (!config) return;
+
+    pollTimer.current = setInterval(async () => {
+      try {
+        const fresh = await loadConfig();
+        setConfig((prev) => {
+          if (!prev) return fresh;
+          // Only update if active_profile changed (Python toggled it)
+          if (fresh.active_profile !== prev.active_profile) {
+            return { ...prev, active_profile: fresh.active_profile };
+          }
+          return prev;
+        });
+      } catch {
+        // Ignore poll errors silently
+      }
+    }, 1500);
+
+    return () => {
+      if (pollTimer.current) clearInterval(pollTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config !== null]);
+
+  const updateConfig = (updater: (prev: AppConfig) => AppConfig) => {
+    setConfig((prev) => {
+      if (!prev) return prev;
+      const next = updater(prev);
+
+      // Debounced save
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => {
+        saveConfig(next).catch(console.error);
+      }, 300);
+
+      return next;
+    });
+  };
+
+  if (!config) {
+    return (
+      <div className="app" style={{ alignItems: "center", justifyContent: "center" }}>
+        <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading config…</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app">
+      {/* Top bar */}
+      <div className="topbar">
+        <span className="topbar-title">StreamDeck</span>
+        <span className="topbar-hint">Python daemon runs separately · config auto-saves</span>
+      </div>
+
+      {/* Profile bar */}
+      <ProfileBar config={config} updateConfig={updateConfig} />
+
+      {/* Main scrollable area */}
+      <div className="main-scroll">
+        {/* Deck panel */}
+        <div className="deck-panel">
+          <ButtonGrid
+            config={config}
+            updateConfig={updateConfig}
+            onButtonClick={(id) => setModalButtonId(id)}
+          />
+          <PotRow config={config} updateConfig={updateConfig} />
+        </div>
+
+        {/* Advanced settings collapsible */}
+        <AdvancedSettings
+          config={config}
+          updateConfig={updateConfig}
+          configPath={configPath}
+          expanded={showAdvanced}
+          onToggle={() => setShowAdvanced((v) => !v)}
+        />
+      </div>
+
+      {/* Keybind modal */}
+      {modalButtonId !== null && (
+        <KeybindModal
+          buttonId={modalButtonId}
+          config={config}
+          updateConfig={updateConfig}
+          onClose={() => setModalButtonId(null)}
+        />
+      )}
+    </div>
+  );
+}

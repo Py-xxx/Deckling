@@ -99,10 +99,9 @@ static void scanButtons() {
           debounceTimer[r][c] = now;
           lastState[r][c]     = pressed;
 
-          if (pressed) {
-            snprintf(msgBuf, sizeof(msgBuf), "B%u:1", (uint8_t)(r * NUM_COLS + c));
-            Serial.println(msgBuf);
-          }
+          // Send both press (:1) and release (:0) so Python can detect holds
+          snprintf(msgBuf, sizeof(msgBuf), "B%u:%d", (uint8_t)(r * NUM_COLS + c), pressed ? 1 : 0);
+          Serial.println(msgBuf);
         }
       }
     }
