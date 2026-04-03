@@ -16,7 +16,7 @@
         "writeFile": true,
         "createDir": true,
         "exists": true,
-        "scope": ["$HOME/.streamdeck/**", "$HOME\\.streamdeck\\**"]
+        "scope": ["$HOME/.streamdeck", "$HOME/.streamdeck/**", "$HOME\\.streamdeck", "$HOME\\.streamdeck\\**"]
       },
       "path": { "all": true }
     },

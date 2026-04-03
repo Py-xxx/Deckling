@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { AppConfig } from "./types";
-import { loadConfig, saveConfig, getConfigPath } from "./configStore";
+import { loadConfig, saveConfig, getConfigPath, DEFAULT_CONFIG } from "./configStore";
 import ProfileBar from "./components/ProfileBar";
 import ButtonGrid from "./components/ButtonGrid";
 import PotRow from "./components/PotRow";
@@ -18,8 +18,16 @@ export default function App() {
 
   // Initial load
   useEffect(() => {
-    loadConfig().then((cfg) => setConfig(cfg));
-    getConfigPath().then((p) => setConfigPath(p));
+    loadConfig()
+      .then((cfg) => setConfig(cfg))
+      .catch((err) => {
+        console.error("Failed to load config:", err);
+        // Use default config as fallback
+        setConfig(structuredClone(DEFAULT_CONFIG) as AppConfig);
+      });
+    getConfigPath()
+      .then((p) => setConfigPath(p))
+      .catch((err) => console.error("Failed to get config path:", err));
   }, []);
 
   // Poll every 1500ms for external changes (Python daemon switching profiles)
@@ -76,7 +84,7 @@ export default function App() {
       {/* Top bar */}
       <div className="topbar">
         <span className="topbar-title">StreamDeck</span>
-        <span className="topbar-hint">Python daemon runs separately · config auto-saves</span>
+        <span className="topbar-hint">config auto-saves</span>
       </div>
 
       {/* Profile bar */}
