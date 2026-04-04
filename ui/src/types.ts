@@ -17,6 +17,7 @@ export interface PotConfig {
   label: string;
   strip: number;
   calibration?: PotCalibration;
+  inverted?: boolean; // Invert pot direction (swap min/max)
 }
 
 export interface Profile {
@@ -51,8 +52,6 @@ export interface Hardware {
   // Maps UI button position to (row_pin, col_pin) pair
   // Key is button position (0, 1, 2...), value is pin pair
   button_pins?: Record<string, ButtonPinMapping>;
-  // Invert pot direction (swap min/max)
-  invert_pots?: boolean;
   // Prevent multiple button presses (ignore when >1 button pressed)
   prevent_multi_press?: boolean;
 }

@@ -41,6 +41,9 @@ pub struct PotConfig {
     pub strip: i8, // -1 = disabled, 0-4 = Voicemeeter strip
     #[serde(default)]
     pub calibration: Option<PotCalibration>,
+    /// Invert this pot's direction (swap min/max)
+    #[serde(default)]
+    pub inverted: bool,
 }
 
 /// Profile with button and pot bindings
@@ -107,9 +110,6 @@ pub struct Hardware {
     pub pot_pins: Vec<u8>,
     #[serde(default)]
     pub button_pins: HashMap<String, ButtonPinMapping>,
-    /// Invert pot direction (swap min/max)
-    #[serde(default)]
-    pub invert_pots: bool,
     /// Prevent multiple button presses (ignore when >1 button pressed)
     #[serde(default)]
     pub prevent_multi_press: bool,
@@ -137,7 +137,6 @@ impl Default for Hardware {
             col_pins,
             pot_pins: vec![0, 1, 2, 3],
             button_pins,
-            invert_pots: false,
             prevent_multi_press: false,
         }
     }
@@ -209,6 +208,7 @@ impl Default for AppConfig {
                     label: label.into(),
                     strip,
                     calibration: None,
+                    inverted: false,
                 },
             );
         }

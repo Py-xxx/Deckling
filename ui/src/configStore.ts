@@ -35,7 +35,6 @@ export const DEFAULT_CONFIG: AppConfig = {
       "10": { row_pin: 4, col_pin: 7 },
       "11": { row_pin: 4, col_pin: 8 },
     },
-    invert_pots: false,
   },
   profile_toggle: {
     button_id: -1,

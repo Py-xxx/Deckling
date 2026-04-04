@@ -79,6 +79,26 @@ export default function PotRow({ config, updateConfig, onCalibrateClick }: Props
     });
   };
 
+  const handleInvertToggle = (potId: number, inverted: boolean) => {
+    updateConfig((prev) => {
+      const p = prev.profiles[prev.active_profile];
+      const existing = p?.pots[String(potId)] ?? { label: "", strip: -1 };
+      return {
+        ...prev,
+        profiles: {
+          ...prev.profiles,
+          [prev.active_profile]: {
+            ...p,
+            pots: {
+              ...p?.pots,
+              [String(potId)]: { ...existing, inverted },
+            },
+          },
+        },
+      };
+    });
+  };
+
   const pots = Array.from({ length: num_pots }, (_, i) => i);
 
   return (
@@ -88,6 +108,7 @@ export default function PotRow({ config, updateConfig, onCalibrateClick }: Props
         const currentLabel = pot?.label ?? "";
         const currentStrip = pot?.strip ?? -1;
         const isCalibrated = pot?.calibration?.enabled ?? false;
+        const isInverted = pot?.inverted ?? false;
 
         return (
           <div key={id} className="pot-item">
@@ -113,6 +134,14 @@ export default function PotRow({ config, updateConfig, onCalibrateClick }: Props
                 </option>
               ))}
             </select>
+            <label className="pot-invert-toggle">
+              <input
+                type="checkbox"
+                checked={isInverted}
+                onChange={(e) => handleInvertToggle(id, e.target.checked)}
+              />
+              <span>Invert</span>
+            </label>
             <button
               className={`pot-calibrate-btn ${isCalibrated ? "calibrated" : ""}`}
               onClick={() => onCalibrateClick?.(id)}

@@ -24,6 +24,8 @@ pub struct Daemon {
     button_press_times: Arc<Mutex<HashMap<u8, Instant>>>,
     active_buttons: Arc<Mutex<HashSet<u8>>>, // Track currently pressed buttons
     last_button_states: Arc<Mutex<HashMap<u8, bool>>>, // Track last button state for edge detection
+    quick_assign_mode: Arc<Mutex<bool>>, // Quick assign mode enabled
+    quick_assign_callback: Arc<Mutex<Option<Box<dyn Fn(u8, u8) + Send + Sync>>>>, // Callback for quick assign
     vm_available: Arc<Mutex<bool>>,
 }
 
@@ -40,6 +42,8 @@ impl Daemon {
             button_press_times: Arc::new(Mutex::new(HashMap::new())),
             active_buttons: Arc::new(Mutex::new(HashSet::new())),
             last_button_states: Arc::new(Mutex::new(HashMap::new())),
+            quick_assign_mode: Arc::new(Mutex::new(false)),
+            quick_assign_callback: Arc::new(Mutex::new(None)),
             vm_available: Arc::new(Mutex::new(false)),
         }
     }
@@ -47,6 +51,21 @@ impl Daemon {
     /// Get the last raw value for a potentiometer (for calibration)
     pub fn get_raw_pot_value(&self, pot_id: u8) -> Option<u16> {
         self.last_raw_pot_values.lock().get(&pot_id).copied()
+    }
+
+    /// Enable quick assign mode with callback
+    pub fn set_quick_assign_callback<F>(&self, callback: F)
+    where
+        F: Fn(u8, u8) + Send + Sync + 'static,
+    {
+        *self.quick_assign_mode.lock() = true;
+        *self.quick_assign_callback.lock() = Some(Box::new(callback));
+    }
+
+    /// Disable quick assign mode
+    pub fn disable_quick_assign(&self) {
+        *self.quick_assign_mode.lock() = false;
+        *self.quick_assign_callback.lock() = None;
     }
 
     /// Initialize Voicemeeter connection
@@ -190,20 +209,20 @@ impl Daemon {
 
         // Convert to dB - use calibration if enabled, otherwise use default curve
         // Note: When calibration is enabled, we use the raw value directly since
-        // calibration captures the actual pot range. invert_pots only applies
+        // calibration captures the actual pot range. Per-pot invert only applies
         // to non-calibrated pots.
         let gain_db = if let Some(ref cal) = pot_cfg.calibration {
             if cal.enabled {
                 // Calibration uses raw values directly - it already knows the pot's direction
                 voicemeeter::raw_to_gain_db_calibrated(raw, cal.raw_min, cal.raw_max)
             } else {
-                // Apply invert only for non-calibrated pots
-                let adjusted = if config.hardware.invert_pots { 1023 - raw } else { raw };
+                // Apply per-pot invert for non-calibrated pots
+                let adjusted = if pot_cfg.inverted { 1023 - raw } else { raw };
                 voicemeeter::raw_to_gain_db(adjusted)
             }
         } else {
-            // Apply invert only for non-calibrated pots
-            let adjusted = if config.hardware.invert_pots { 1023 - raw } else { raw };
+            // Apply per-pot invert for non-calibrated pots
+            let adjusted = if pot_cfg.inverted { 1023 - raw } else { raw };
             voicemeeter::raw_to_gain_db(adjusted)
         };
         let gain_int = gain_db.round() as i16;

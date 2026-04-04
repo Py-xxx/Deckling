@@ -24,17 +24,29 @@ export default function PinEditModal({ buttonId, config, updateConfig, onClose }
   const handleSave = () => {
     updateConfig((prev) => {
       const currentPins = prev.hardware.button_pins || {};
+      
+      // Find and remove any conflicting button assignment
+      const newPins = { ...currentPins };
+      for (const [id, mapping] of Object.entries(currentPins)) {
+        if (id !== String(buttonId) && 
+            mapping.row_pin === selectedRowPin && 
+            mapping.col_pin === selectedColPin) {
+          // Remove the conflicting button's pin assignment
+          delete newPins[id];
+        }
+      }
+      
+      // Add the new assignment
+      newPins[String(buttonId)] = {
+        row_pin: selectedRowPin,
+        col_pin: selectedColPin,
+      };
+      
       return {
         ...prev,
         hardware: {
           ...prev.hardware,
-          button_pins: {
-            ...currentPins,
-            [String(buttonId)]: {
-              row_pin: selectedRowPin,
-              col_pin: selectedColPin,
-            },
-          },
+          button_pins: newPins,
         },
       };
     });
@@ -107,7 +119,7 @@ export default function PinEditModal({ buttonId, config, updateConfig, onClose }
         {/* Conflict Warning */}
         {conflict && (
           <div className="pin-conflict-warning">
-            ⚠️ Button {conflict} is already using this pin combination. Saving will swap the assignments.
+            ⚠️ Button {conflict} is already using this pin combination. Saving will unassign Button {conflict} and assign it to this button.
           </div>
         )}
 
