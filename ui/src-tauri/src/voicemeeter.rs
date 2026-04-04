@@ -283,6 +283,37 @@ pub fn raw_to_gain_db(raw: u16) -> f32 {
     raw_to_gain_db_with_curve(raw, 10000)
 }
 
+/// Convert raw ADC value to dB gain with calibration
+/// 
+/// # Arguments
+/// * `raw` - Raw ADC value from Arduino
+/// * `cal_min` - Raw value at pot's minimum position (typically highest ADC value due to inversion)
+/// * `cal_max` - Raw value at pot's maximum position (typically lowest ADC value due to inversion)
+pub fn raw_to_gain_db_calibrated(raw: u16, cal_min: u16, cal_max: u16) -> f32 {
+    // Handle edge cases
+    if cal_min == cal_max {
+        return -60.0; // No range, return minimum
+    }
+    
+    let raw = raw as f32;
+    let cal_min = cal_min as f32;
+    let cal_max = cal_max as f32;
+    
+    // Normalize to 0-1 range based on calibrated min/max
+    // cal_min is the raw value when pot is at minimum (e.g., 1023)
+    // cal_max is the raw value when pot is at maximum (e.g., 0)
+    let normalized = if cal_min > cal_max {
+        // Normal inverted pot: high raw = min volume, low raw = max volume
+        ((cal_min - raw) / (cal_min - cal_max)).clamp(0.0, 1.0)
+    } else {
+        // Non-inverted pot: low raw = min volume, high raw = max volume
+        ((raw - cal_min) / (cal_max - cal_min)).clamp(0.0, 1.0)
+    };
+    
+    // Map 0-1 to -60..+12 (72 dB range)
+    normalized * 72.0 - 60.0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

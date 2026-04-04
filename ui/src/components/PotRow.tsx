@@ -4,6 +4,7 @@ import type { AppConfig } from "../types";
 interface Props {
   config: AppConfig;
   updateConfig: (updater: (prev: AppConfig) => AppConfig) => void;
+  onCalibrateClick?: (potId: number) => void;
 }
 
 const VM_STRIPS = [
@@ -30,7 +31,7 @@ function KnobSvg() {
   );
 }
 
-export default function PotRow({ config, updateConfig }: Props) {
+export default function PotRow({ config, updateConfig, onCalibrateClick }: Props) {
   const { num_pots } = config.display;
   const profile = config.profiles[config.active_profile];
   const labelTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
@@ -86,6 +87,7 @@ export default function PotRow({ config, updateConfig }: Props) {
         const pot = profile?.pots[String(id)];
         const currentLabel = pot?.label ?? "";
         const currentStrip = pot?.strip ?? -1;
+        const isCalibrated = pot?.calibration?.enabled ?? false;
 
         return (
           <div key={id} className="pot-item">
@@ -111,6 +113,13 @@ export default function PotRow({ config, updateConfig }: Props) {
                 </option>
               ))}
             </select>
+            <button
+              className={`pot-calibrate-btn ${isCalibrated ? "calibrated" : ""}`}
+              onClick={() => onCalibrateClick?.(id)}
+              title={isCalibrated ? "Calibration enabled — Click to edit" : "Calibrate this potentiometer"}
+            >
+              {isCalibrated ? "✓ Calibrated" : "Calibrate"}
+            </button>
           </div>
         );
       })}

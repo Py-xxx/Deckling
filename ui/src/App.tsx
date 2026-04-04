@@ -6,12 +6,14 @@ import ButtonGrid from "./components/ButtonGrid";
 import PotRow from "./components/PotRow";
 import KeybindModal from "./components/KeybindModal";
 import PinEditModal from "./components/PinEditModal";
+import PotCalibrationModal from "./components/PotCalibrationModal";
 import AdvancedSettings from "./components/AdvancedSettings";
 
 export default function App() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [modalButtonId, setModalButtonId] = useState<number | null>(null);
   const [pinEditButtonId, setPinEditButtonId] = useState<number | null>(null);
+  const [calibratePotId, setCalibratePotId] = useState<number | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [configPath, setConfigPath] = useState<string>("");
 
@@ -102,7 +104,11 @@ export default function App() {
             onButtonClick={(id) => setModalButtonId(id)}
             onPinEditClick={(id) => setPinEditButtonId(id)}
           />
-          <PotRow config={config} updateConfig={updateConfig} />
+          <PotRow 
+            config={config} 
+            updateConfig={updateConfig} 
+            onCalibrateClick={(id) => setCalibratePotId(id)}
+          />
         </div>
 
         {/* Advanced settings collapsible */}
@@ -132,6 +138,16 @@ export default function App() {
           config={config}
           updateConfig={updateConfig}
           onClose={() => setPinEditButtonId(null)}
+        />
+      )}
+
+      {/* Pot calibration modal */}
+      {calibratePotId !== null && (
+        <PotCalibrationModal
+          potId={calibratePotId}
+          config={config}
+          updateConfig={updateConfig}
+          onClose={() => setCalibratePotId(null)}
         />
       )}
     </div>

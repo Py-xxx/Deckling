@@ -196,3 +196,11 @@ export async function setLaunchOnStartup(enabled: boolean): Promise<void> {
 export async function pickExecutable(): Promise<string | null> {
   return await invoke<string | null>("pick_executable");
 }
+
+// ============================================================================
+// Calibration
+// ============================================================================
+
+export async function getRawPotValue(potId: number): Promise<number | null> {
+  return await invoke<number | null>("get_raw_pot_value", { potId });
+}

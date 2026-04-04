@@ -20,6 +20,7 @@ pub struct Daemon {
     serial: Arc<SerialManager>,
     config: Arc<Mutex<AppConfig>>,
     last_pot_values: Arc<Mutex<HashMap<u8, i16>>>,
+    last_raw_pot_values: Arc<Mutex<HashMap<u8, u16>>>, // For calibration
     button_press_times: Arc<Mutex<HashMap<u8, Instant>>>,
     vm_available: Arc<Mutex<bool>>,
 }
@@ -33,9 +34,15 @@ impl Daemon {
             serial: Arc::new(SerialManager::new()),
             config: Arc::new(Mutex::new(config)),
             last_pot_values: Arc::new(Mutex::new(HashMap::new())),
+            last_raw_pot_values: Arc::new(Mutex::new(HashMap::new())),
             button_press_times: Arc::new(Mutex::new(HashMap::new())),
             vm_available: Arc::new(Mutex::new(false)),
         }
+    }
+
+    /// Get the last raw value for a potentiometer (for calibration)
+    pub fn get_raw_pot_value(&self, pot_id: u8) -> Option<u16> {
+        self.last_raw_pot_values.lock().get(&pot_id).copied()
     }
 
     /// Initialize Voicemeeter connection
@@ -93,6 +100,7 @@ impl Daemon {
     pub fn connect(&self, port: &str) -> Result<(), String> {
         let config = Arc::clone(&self.config);
         let last_pot_values = Arc::clone(&self.last_pot_values);
+        let last_raw_pot_values = Arc::clone(&self.last_raw_pot_values);
         let button_press_times = Arc::clone(&self.button_press_times);
         let vm_available = Arc::clone(&self.vm_available);
 
@@ -103,6 +111,7 @@ impl Daemon {
                 msg,
                 &config,
                 &last_pot_values,
+                &last_raw_pot_values,
                 &button_press_times,
                 *vm_available.lock(),
             );
@@ -122,11 +131,14 @@ impl Daemon {
         msg: ArduinoMessage,
         config: &AppConfig,
         last_pot_values: &Mutex<HashMap<u8, i16>>,
+        last_raw_pot_values: &Mutex<HashMap<u8, u16>>,
         button_press_times: &Mutex<HashMap<u8, Instant>>,
         vm_available: bool,
     ) {
         match msg {
             ArduinoMessage::Pot { id, value } => {
+                // Store raw value for calibration
+                last_raw_pot_values.lock().insert(id, value);
                 Self::handle_pot(id, value, config, last_pot_values, vm_available);
             }
             ArduinoMessage::Button { id, pressed } => {
@@ -166,9 +178,23 @@ impl Daemon {
             return;
         }
 
-        // Convert to dB using configured pot ohms
-        let pot_ohms = config.hardware.pot_ohms;
-        let gain_db = voicemeeter::raw_to_gain_db_with_curve(raw, pot_ohms);
+        // Apply invert if enabled
+        let raw = if config.hardware.invert_pots {
+            1023 - raw
+        } else {
+            raw
+        };
+
+        // Convert to dB - use calibration if enabled, otherwise use default curve
+        let gain_db = if let Some(ref cal) = pot_cfg.calibration {
+            if cal.enabled {
+                voicemeeter::raw_to_gain_db_calibrated(raw, cal.raw_min, cal.raw_max)
+            } else {
+                voicemeeter::raw_to_gain_db_with_curve(raw, config.hardware.pot_ohms)
+            }
+        } else {
+            voicemeeter::raw_to_gain_db_with_curve(raw, config.hardware.pot_ohms)
+        };
         let gain_int = gain_db.round() as i16;
 
         // Check if changed (integer comparison to reduce jitter)

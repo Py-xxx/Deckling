@@ -7,9 +7,16 @@ export interface ButtonConfig {
   action_type?: ActionType; // Optional for backwards compatibility
 }
 
+export interface PotCalibration {
+  enabled: boolean;
+  raw_min: number;  // Raw ADC value at pot's minimum position
+  raw_max: number;  // Raw ADC value at pot's maximum position
+}
+
 export interface PotConfig {
   label: string;
   strip: number;
+  calibration?: PotCalibration;
 }
 
 export interface Profile {
@@ -45,6 +52,8 @@ export interface Hardware {
   button_pins?: Record<string, ButtonPinMapping>;
   // Potentiometer resistance in ohms (affects response curve)
   pot_ohms?: number;
+  // Invert pot direction (swap min/max)
+  invert_pots?: boolean;
 }
 
 export interface AppConfig {

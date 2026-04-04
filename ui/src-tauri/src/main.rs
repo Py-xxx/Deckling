@@ -125,6 +125,17 @@ fn reload_daemon_config() {
 }
 
 // ============================================================================
+// Tauri Commands - Calibration
+// ============================================================================
+
+#[tauri::command]
+fn get_raw_pot_value(pot_id: u8) -> Option<u16> {
+    let daemon = get_daemon();
+    let daemon = daemon.lock();
+    daemon.get_raw_pot_value(pot_id)
+}
+
+// ============================================================================
 // Tauri Commands - Startup
 // ============================================================================
 
@@ -247,6 +258,8 @@ fn main() {
             // Config
             notify_config_updated,
             reload_daemon_config,
+            // Calibration
+            get_raw_pot_value,
             // Startup
             get_launch_on_startup,
             set_launch_on_startup,

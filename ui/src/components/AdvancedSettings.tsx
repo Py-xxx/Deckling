@@ -237,6 +237,14 @@ export default function AdvancedSettings({
     }));
   };
 
+  // Invert pots
+  const handleInvertPots = (enabled: boolean) => {
+    updateConfig((prev) => ({
+      ...prev,
+      hardware: { ...prev.hardware, invert_pots: enabled },
+    }));
+  };
+
   const { grid_rows, grid_cols } = config.display;
   const total = grid_rows * grid_cols;
   const toggleId = config.profile_toggle.button_id;
@@ -565,6 +573,17 @@ export default function AdvancedSettings({
                 <option value={100000}>100kΩ</option>
               </select>
               <span className="settings-helper">Resistance value of your potentiometers</span>
+            </div>
+            <div className="settings-group" style={{ marginTop: 8 }}>
+              <label className="invert-pots-toggle">
+                <input
+                  type="checkbox"
+                  checked={config.hardware.invert_pots ?? false}
+                  onChange={(e) => handleInvertPots(e.target.checked)}
+                />
+                Invert Potentiometers
+              </label>
+              <span className="settings-helper">Swap min/max direction if wired backwards</span>
             </div>
           </div>
 

@@ -16,11 +16,31 @@ pub struct ButtonConfig {
     pub action_type: Option<String>, // "keyboard", "mouse", "multimedia", "launch"
 }
 
+/// Potentiometer calibration data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PotCalibration {
+    pub enabled: bool,
+    pub raw_min: u16,  // Raw ADC value at pot's minimum position
+    pub raw_max: u16,  // Raw ADC value at pot's maximum position
+}
+
+impl Default for PotCalibration {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            raw_min: 0,
+            raw_max: 1023,
+        }
+    }
+}
+
 /// Potentiometer configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PotConfig {
     pub label: String,
     pub strip: i8, // -1 = disabled, 0-4 = Voicemeeter strip
+    #[serde(default)]
+    pub calibration: Option<PotCalibration>,
 }
 
 /// Profile with button and pot bindings
@@ -88,6 +108,9 @@ pub struct Hardware {
     /// Common values: 1000 (1kΩ), 5000 (5kΩ), 10000 (10kΩ), 50000 (50kΩ), 100000 (100kΩ)
     #[serde(default = "default_pot_ohms")]
     pub pot_ohms: u32,
+    /// Invert pot direction (swap min/max)
+    #[serde(default)]
+    pub invert_pots: bool,
 }
 
 fn default_pot_ohms() -> u32 {
@@ -117,6 +140,7 @@ impl Default for Hardware {
             pot_pins: vec![0, 1, 2, 3],
             button_pins,
             pot_ohms: 10000, // 10kΩ default
+            invert_pots: false,
         }
     }
 }
@@ -186,6 +210,7 @@ impl Default for AppConfig {
                 PotConfig {
                     label: label.into(),
                     strip,
+                    calibration: None,
                 },
             );
         }

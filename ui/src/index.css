@@ -1188,3 +1188,191 @@ select {
   font-family: monospace;
   opacity: 0.7;
 }
+
+/* ── Pot Calibration Button ── */
+.pot-calibrate-btn {
+  margin-top: 4px;
+  padding: 4px 8px;
+  font-size: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pot-calibrate-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.pot-calibrate-btn.calibrated {
+  background: rgba(46, 125, 50, 0.2);
+  border-color: #4caf50;
+  color: #81c784;
+}
+
+.pot-calibrate-btn.calibrated:hover {
+  background: rgba(46, 125, 50, 0.3);
+}
+
+/* ── Calibration Modal ── */
+.calibration-modal {
+  max-width: 400px;
+}
+
+.calibration-description {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.calibration-description p {
+  margin-bottom: 12px;
+}
+
+.calibration-description ol {
+  margin-left: 20px;
+  margin-bottom: 12px;
+}
+
+.calibration-description li {
+  margin-bottom: 4px;
+}
+
+.calibration-current {
+  background: var(--surface);
+  padding: 10px;
+  border-radius: 6px;
+  margin: 12px 0;
+  font-size: 12px;
+}
+
+.calibration-current strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--accent);
+}
+
+.pot-label {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: normal;
+}
+
+.calibration-step {
+  text-align: center;
+}
+
+.step-number {
+  font-size: 12px;
+  color: var(--accent);
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.calibration-step p {
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.current-value-display {
+  background: var(--surface);
+  padding: 20px;
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.value-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.value-number {
+  font-size: 36px;
+  font-weight: 600;
+  font-family: monospace;
+  color: var(--accent);
+}
+
+.calibration-captured {
+  background: rgba(46, 125, 50, 0.15);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.calibration-captured span {
+  color: var(--text-muted);
+}
+
+.calibration-captured strong {
+  color: #81c784;
+  font-family: monospace;
+}
+
+.calibration-summary {
+  background: var(--surface);
+  padding: 16px;
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.calibration-value {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.calibration-value span {
+  color: var(--text-muted);
+}
+
+.calibration-value strong {
+  font-family: monospace;
+  color: var(--text);
+}
+
+.calibration-range {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.range-warning {
+  color: #f9a825;
+}
+
+.btn-danger {
+  background: rgba(229, 57, 53, 0.15);
+  border-color: var(--danger);
+  color: #ef5350;
+}
+
+.btn-danger:hover {
+  background: rgba(229, 57, 53, 0.25);
+}
+
+/* ── Invert Pots Toggle ── */
+.invert-pots-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.invert-pots-toggle input {
+  cursor: pointer;
+}
