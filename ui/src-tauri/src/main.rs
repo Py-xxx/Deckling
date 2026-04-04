@@ -17,6 +17,10 @@ use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use serial::{ConnectionState, PortInfo};
 use std::sync::Arc;
+use tauri::{
+    CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
+    WindowEvent,
+};
 
 /// Global daemon instance
 static DAEMON: OnceCell<Arc<Mutex<Daemon>>> = OnceCell::new();
@@ -143,6 +147,22 @@ fn set_launch_on_startup(enabled: bool) -> Result<(), String> {
 }
 
 // ============================================================================
+// Tauri Commands - File Picker
+// ============================================================================
+
+#[tauri::command]
+fn pick_executable() -> Option<String> {
+    use rfd::FileDialog;
+    
+    let file = FileDialog::new()
+        .add_filter("Executable", &["exe"])
+        .set_title("Select Application")
+        .pick_file();
+    
+    file.map(|p| p.to_string_lossy().to_string())
+}
+
+// ============================================================================
 // App Initialization
 // ============================================================================
 
@@ -173,7 +193,48 @@ fn main() {
         }
     }
 
+    // Build system tray menu
+    let show = CustomMenuItem::new("show".to_string(), "Show Deckling");
+    let quit = CustomMenuItem::new("quit".to_string(), "Quit");
+    let tray_menu = SystemTrayMenu::new()
+        .add_item(show)
+        .add_native_item(SystemTrayMenuItem::Separator)
+        .add_item(quit);
+    
+    let system_tray = SystemTray::new().with_menu(tray_menu);
+
     tauri::Builder::default()
+        .system_tray(system_tray)
+        .on_system_tray_event(|app, event| match event {
+            SystemTrayEvent::LeftClick { .. } => {
+                // Show window on left click
+                if let Some(window) = app.get_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+            SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
+                "show" => {
+                    if let Some(window) = app.get_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                }
+                "quit" => {
+                    // Actually quit the app
+                    std::process::exit(0);
+                }
+                _ => {}
+            },
+            _ => {}
+        })
+        .on_window_event(|event| {
+            // Hide window instead of closing when X button is clicked
+            if let WindowEvent::CloseRequested { api, .. } = event.event() {
+                event.window().hide().unwrap();
+                api.prevent_close();
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             // Serial
             list_serial_ports,
@@ -189,6 +250,8 @@ fn main() {
             // Startup
             get_launch_on_startup,
             set_launch_on_startup,
+            // File Picker
+            pick_executable,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

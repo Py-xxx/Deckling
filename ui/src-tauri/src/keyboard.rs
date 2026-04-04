@@ -2,9 +2,93 @@
 //!
 //! Parses action strings like "ctrl+alt+m" and simulates the key combination.
 
-use enigo::{Direction, Enigo, Key, Keyboard, Settings};
+use enigo::{Direction, Enigo, Key, Keyboard, Mouse, Button, Settings};
 use std::thread;
 use std::time::Duration;
+
+/// Execute an action based on its type.
+///
+/// # Action Types
+/// - `mouse_*` → Mouse click (left, right, middle, double)
+/// - `launch:*` → Launch application
+/// - Otherwise → Keyboard shortcut
+pub fn execute_action(action: &str) {
+    let action = action.trim();
+    if action.is_empty() {
+        return;
+    }
+
+    // Mouse actions
+    if action.starts_with("mouse_") {
+        send_mouse_click(action);
+        return;
+    }
+
+    // Launch actions
+    if action.starts_with("launch:") {
+        launch_app(&action[7..]);
+        return;
+    }
+
+    // Keyboard shortcuts
+    send_keys(action);
+}
+
+/// Send a mouse click
+fn send_mouse_click(action: &str) {
+    let mut enigo = match Enigo::new(&Settings::default()) {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("Failed to create Enigo for mouse: {:?}", e);
+            return;
+        }
+    };
+
+    let button = match action {
+        "mouse_left" => Button::Left,
+        "mouse_right" => Button::Right,
+        "mouse_middle" => Button::Middle,
+        "mouse_double" => {
+            // Double click = two rapid left clicks
+            let _ = enigo.button(Button::Left, Direction::Click);
+            thread::sleep(Duration::from_millis(50));
+            let _ = enigo.button(Button::Left, Direction::Click);
+            return;
+        }
+        _ => {
+            eprintln!("Unknown mouse action: {}", action);
+            return;
+        }
+    };
+
+    let _ = enigo.button(button, Direction::Click);
+}
+
+/// Launch an application
+fn launch_app(path: &str) {
+    let path = path.trim();
+    if path.is_empty() {
+        return;
+    }
+
+    #[cfg(windows)]
+    {
+        // On Windows, use cmd /c start to launch in background
+        let result = Command::new("cmd")
+            .args(["/C", "start", "", path])
+            .spawn();
+
+        match result {
+            Ok(_) => println!("Launched: {}", path),
+            Err(e) => eprintln!("Failed to launch {}: {:?}", path, e),
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        eprintln!("App launching not implemented on this platform");
+    }
+}
 
 /// Parse and execute a keybind action string.
 ///

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { AppConfig } from "../types";
+import type { ActionType, AppConfig } from "../types";
+import { pickExecutable } from "../configStore";
 
 interface Props {
   buttonId: number;
@@ -44,6 +45,46 @@ function normalizeKey(key: string): string {
   return key.toLowerCase();
 }
 
+const MOUSE_OPTIONS = [
+  { value: "mouse_left", label: "Left Click" },
+  { value: "mouse_right", label: "Right Click" },
+  { value: "mouse_middle", label: "Middle Click" },
+  { value: "mouse_double", label: "Double Click" },
+];
+
+const MULTIMEDIA_OPTIONS = [
+  { value: "playpause", label: "Play / Pause" },
+  { value: "medianexttrack", label: "Next Track" },
+  { value: "mediaprevtrack", label: "Previous Track" },
+  { value: "mediastop", label: "Stop" },
+  { value: "volumemute", label: "Mute" },
+  { value: "volumeup", label: "Volume Up" },
+  { value: "volumedown", label: "Volume Down" },
+];
+
+type Category = "keyboard" | "mouse" | "multimedia" | "launch";
+
+interface CategoryInfo {
+  id: Category;
+  label: string;
+  icon: string;
+}
+
+const CATEGORIES: CategoryInfo[] = [
+  { id: "keyboard", label: "Keyboard", icon: "⌨️" },
+  { id: "mouse", label: "Mouse", icon: "🖱️" },
+  { id: "multimedia", label: "Multimedia", icon: "🎵" },
+  { id: "launch", label: "Launch App", icon: "🚀" },
+];
+
+function detectCategory(action: string): Category {
+  if (!action) return "keyboard";
+  if (action.startsWith("mouse_")) return "mouse";
+  if (action.startsWith("launch:")) return "launch";
+  if (MULTIMEDIA_OPTIONS.some((opt) => opt.value === action)) return "multimedia";
+  return "keyboard";
+}
+
 export default function KeybindModal({ buttonId, config, updateConfig, onClose }: Props) {
   const profile = config.profiles[config.active_profile];
   const existing = profile?.buttons[String(buttonId)];
@@ -51,6 +92,9 @@ export default function KeybindModal({ buttonId, config, updateConfig, onClose }
   const [labelText, setLabelText] = useState(existing?.label ?? "");
   const [capturedAction, setCapturedAction] = useState(existing?.action ?? "");
   const [isCapturing, setIsCapturing] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<Category>(
+    existing?.action_type ?? detectCategory(existing?.action ?? "")
+  );
 
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -96,7 +140,7 @@ export default function KeybindModal({ buttonId, config, updateConfig, onClose }
   };
 
   const handleSave = () => {
-    const finalLabel = labelText.trim() || capturedAction;
+    const finalLabel = labelText.trim() || getDefaultLabel();
     const finalAction = capturedAction.trim();
 
     updateConfig((prev) => {
@@ -112,6 +156,7 @@ export default function KeybindModal({ buttonId, config, updateConfig, onClose }
               [String(buttonId)]: {
                 label: finalLabel,
                 action: finalAction,
+                action_type: activeCategory as ActionType,
               },
             },
           },
@@ -119,6 +164,21 @@ export default function KeybindModal({ buttonId, config, updateConfig, onClose }
       };
     });
     onClose();
+  };
+
+  const getDefaultLabel = () => {
+    if (activeCategory === "mouse") {
+      return MOUSE_OPTIONS.find((o) => o.value === capturedAction)?.label ?? "Mouse";
+    }
+    if (activeCategory === "multimedia") {
+      return MULTIMEDIA_OPTIONS.find((o) => o.value === capturedAction)?.label ?? "Media";
+    }
+    if (activeCategory === "launch") {
+      const path = capturedAction.replace("launch:", "");
+      const name = path.split("\\").pop()?.split("/").pop() ?? "App";
+      return name.replace(".exe", "");
+    }
+    return capturedAction;
   };
 
   const handleClear = () => {
@@ -144,66 +204,167 @@ export default function KeybindModal({ buttonId, config, updateConfig, onClose }
     onClose();
   };
 
+  const handleBrowse = async () => {
+    const path = await pickExecutable();
+    if (path) {
+      setCapturedAction(`launch:${path}`);
+      // Auto-set label to exe name
+      const name = path.split("\\").pop()?.split("/").pop() ?? "App";
+      if (!labelText.trim()) {
+        setLabelText(name.replace(".exe", ""));
+      }
+    }
+  };
+
   const captureAreaClass =
     "modal-capture-area" +
     (isCapturing ? " active" : capturedAction ? " has-binding" : "");
 
+  const renderCategoryContent = () => {
+    switch (activeCategory) {
+      case "keyboard":
+        return (
+          <>
+            {/* Capture area */}
+            <div className="modal-section-label">Press a key combination</div>
+            <div
+              className={captureAreaClass}
+              onClick={() => setIsCapturing(true)}
+            >
+              {isCapturing ? (
+                <span style={{ color: "var(--accent)", fontSize: 13 }}>
+                  Press keys now…
+                </span>
+              ) : capturedAction && activeCategory === "keyboard" ? (
+                capturedAction
+              ) : (
+                <span className="capture-placeholder">
+                  Click here, then press keys…
+                </span>
+              )}
+            </div>
+
+            {/* OR divider */}
+            <div className="modal-or-divider" style={{ margin: "10px 0" }}>
+              or type manually
+            </div>
+
+            {/* Manual text input */}
+            <input
+              className="modal-input"
+              type="text"
+              value={activeCategory === "keyboard" ? capturedAction : ""}
+              placeholder="e.g. ctrl+shift+s"
+              onChange={(e) => {
+                setCapturedAction(e.target.value);
+                setIsCapturing(false);
+              }}
+            />
+          </>
+        );
+
+      case "mouse":
+        return (
+          <>
+            <div className="modal-section-label">Select mouse action</div>
+            <div className="keybind-option-list">
+              {MOUSE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  className={`keybind-option ${capturedAction === opt.value ? "selected" : ""}`}
+                  onClick={() => setCapturedAction(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </>
+        );
+
+      case "multimedia":
+        return (
+          <>
+            <div className="modal-section-label">Select media action</div>
+            <div className="keybind-option-list">
+              {MULTIMEDIA_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  className={`keybind-option ${capturedAction === opt.value ? "selected" : ""}`}
+                  onClick={() => setCapturedAction(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </>
+        );
+
+      case "launch":
+        return (
+          <>
+            <div className="modal-section-label">Select application to launch</div>
+            <button className="btn-primary browse-btn" onClick={handleBrowse}>
+              📂 Browse for .exe
+            </button>
+            {capturedAction.startsWith("launch:") && (
+              <div className="selected-app">
+                <span className="app-icon">🎯</span>
+                <span className="app-path">{capturedAction.replace("launch:", "")}</span>
+              </div>
+            )}
+          </>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="modal-overlay" ref={overlayRef} onClick={handleOverlayClick}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-title">Button {buttonId}</div>
-
-        {/* Label section */}
-        <div>
-          <div className="modal-section-label">Label</div>
-          <input
-            className="modal-label-input"
-            type="text"
-            value={labelText}
-            placeholder="Button label (optional)"
-            onChange={(e) => setLabelText(e.target.value)}
-            autoFocus
-          />
+      <div className="keybind-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="keybind-modal-header">
+          <div className="modal-title">Configure Button {buttonId}</div>
         </div>
 
-        {/* Action section */}
-        <div>
-          <div className="modal-section-label">Action</div>
-
-          {/* Capture area */}
-          <div
-            className={captureAreaClass}
-            onClick={() => setIsCapturing(true)}
-          >
-            {isCapturing ? (
-              <span style={{ color: "var(--accent)", fontSize: 13 }}>
-                Press keys now…
-              </span>
-            ) : capturedAction ? (
-              capturedAction
-            ) : (
-              <span className="capture-placeholder">
-                Click here, then press keys…
-              </span>
-            )}
+        <div className="keybind-modal-body">
+          {/* Sidebar */}
+          <div className="keybind-sidebar">
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                className={`sidebar-item ${activeCategory === cat.id ? "active" : ""}`}
+                onClick={() => {
+                  setActiveCategory(cat.id);
+                  // Clear action when switching categories
+                  if (cat.id !== activeCategory) {
+                    setCapturedAction("");
+                  }
+                }}
+              >
+                <span className="sidebar-icon">{cat.icon}</span>
+                <span className="sidebar-label">{cat.label}</span>
+              </button>
+            ))}
           </div>
 
-          {/* OR divider */}
-          <div className="modal-or-divider" style={{ margin: "10px 0" }}>
-            or type manually
-          </div>
+          {/* Content */}
+          <div className="keybind-content">
+            {/* Label section */}
+            <div style={{ marginBottom: 16 }}>
+              <div className="modal-section-label">Label (optional)</div>
+              <input
+                className="modal-label-input"
+                type="text"
+                value={labelText}
+                placeholder="Button label"
+                onChange={(e) => setLabelText(e.target.value)}
+              />
+            </div>
 
-          {/* Manual text input */}
-          <input
-            className="modal-input"
-            type="text"
-            value={capturedAction}
-            placeholder="e.g. ctrl+shift+s"
-            onChange={(e) => {
-              setCapturedAction(e.target.value);
-              setIsCapturing(false);
-            }}
-          />
+            {/* Category-specific content */}
+            {renderCategoryContent()}
+          </div>
         </div>
 
         {/* Actions */}

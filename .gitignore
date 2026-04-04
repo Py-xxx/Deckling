@@ -17,7 +17,7 @@ ui/dist/
 # Tauri build output
 ui/src-tauri/target/
 
-# User config (stored at ~/.streamdeck/config.json, not in repo)
+# User config (stored at ~/.deckling/config.json, not in repo)
 config.json
 *.tmp
 

@@ -6,7 +6,7 @@
 //! - Profile toggle button
 
 use crate::config::{load_config, AppConfig};
-use crate::keyboard::send_keys;
+use crate::keyboard::execute_action;
 use crate::serial::{ArduinoMessage, ConnectionState, SerialManager};
 #[cfg(windows)]
 use crate::voicemeeter;
@@ -166,8 +166,9 @@ impl Daemon {
             return;
         }
 
-        // Convert to dB
-        let gain_db = voicemeeter::raw_to_gain_db(raw);
+        // Convert to dB using configured pot ohms
+        let pot_ohms = config.hardware.pot_ohms;
+        let gain_db = voicemeeter::raw_to_gain_db_with_curve(raw, pot_ohms);
         let gain_int = gain_db.round() as i16;
 
         // Check if changed (integer comparison to reduce jitter)
@@ -202,11 +203,45 @@ impl Daemon {
         config: &AppConfig,
         button_press_times: &Mutex<HashMap<u8, Instant>>,
     ) {
+        // Convert Arduino button ID to (row_pin, col_pin)
+        // Arduino calculates: id = row_index * num_cols + col_index
+        let num_cols = config.hardware.col_pins.len();
+        if num_cols == 0 {
+            return;
+        }
+        
+        let row_index = (id as usize) / num_cols;
+        let col_index = (id as usize) % num_cols;
+        
+        let row_pin = config.hardware.row_pins.get(row_index).copied();
+        let col_pin = config.hardware.col_pins.get(col_index).copied();
+        
+        let (row_pin, col_pin) = match (row_pin, col_pin) {
+            (Some(r), Some(c)) => (r, c),
+            _ => return, // Invalid button ID
+        };
+        
+        // Find UI button position that maps to this pin pair
+        let ui_button_id = config.hardware.button_pins.iter()
+            .find(|(_, mapping)| mapping.row_pin == row_pin && mapping.col_pin == col_pin)
+            .map(|(id, _)| id.clone());
+        
+        let ui_button_id = match ui_button_id {
+            Some(id) => id,
+            None => {
+                // No mapping found, fall back to raw ID
+                id.to_string()
+            }
+        };
+        
+        // Parse UI button ID to u8 for toggle check
+        let ui_button_num: u8 = ui_button_id.parse().unwrap_or(id);
+        
         let toggle = &config.profile_toggle;
 
         // Check if this is the profile toggle button
-        if toggle.button_id >= 0 && id == toggle.button_id as u8 {
-            Self::handle_profile_toggle(pressed, config, button_press_times, id);
+        if toggle.button_id >= 0 && ui_button_num == toggle.button_id as u8 {
+            Self::handle_profile_toggle(pressed, config, button_press_times, ui_button_num);
             return;
         }
 
@@ -221,15 +256,15 @@ impl Daemon {
             None => return,
         };
 
-        // Get button config
-        let btn_cfg = match profile.buttons.get(&id.to_string()) {
+        // Get button config using UI button ID
+        let btn_cfg = match profile.buttons.get(&ui_button_id) {
             Some(b) => b,
             None => return,
         };
 
         // Execute action
         if !btn_cfg.action.is_empty() {
-            send_keys(&btn_cfg.action);
+            execute_action(&btn_cfg.action);
         }
     }
 
@@ -267,8 +302,22 @@ impl Daemon {
 
     /// Cycle to the next profile
     fn cycle_profile(config: &AppConfig) {
-        let mut profiles: Vec<&String> = config.profiles.keys().collect();
-        profiles.sort();
+        let cycle_profiles = &config.profile_toggle.cycle_profiles;
+        
+        // Get profiles to cycle through
+        let profiles: Vec<&String> = if cycle_profiles.is_empty() {
+            // Cycle through all profiles
+            let mut all: Vec<&String> = config.profiles.keys().collect();
+            all.sort();
+            all
+        } else {
+            // Cycle through selected profiles only
+            let mut selected: Vec<&String> = config.profiles.keys()
+                .filter(|k| cycle_profiles.contains(k))
+                .collect();
+            selected.sort();
+            selected
+        };
 
         if profiles.is_empty() {
             return;

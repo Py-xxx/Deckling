@@ -1,9 +1,9 @@
-# StreamDeck Controller
+# Deckling
 
-A Tauri + React/TypeScript desktop app for the StreamDeck hardware controller. This single app handles everything:
+A Tauri + React/TypeScript desktop app for the Deckling hardware controller. This single app handles everything:
 - Serial communication with Arduino
 - Voicemeeter Banana gain control
-- Keyboard shortcut execution
+- Keyboard shortcut, mouse click, media key, and app launch execution
 - Configuration UI
 
 ---
@@ -46,8 +46,8 @@ The compiled binary and installer will be in `src-tauri/target/release/bundle/`.
 ## First Run
 
 On first launch, the app automatically creates:
-- `~/.streamdeck/` directory
-- `~/.streamdeck/config.json` with default settings
+- `~/.deckling/` directory
+- `~/.deckling/config.json` with default settings
 
 ---
 
@@ -56,11 +56,14 @@ On first launch, the app automatically creates:
 In Advanced Settings you can configure:
 - **Serial Port** — Select the COM port for your Arduino
 - **Auto-Connect** — Automatically connect on app startup
-- **Launch on Startup** — Start StreamDeck when Windows boots
+- **Launch on Startup** — Start Deckling when Windows boots
 - **Display Grid** — Button grid dimensions
 - **Number of Pots** — How many potentiometers you have
 - **Profile Toggle** — Assign a button to switch profiles
+- **Cycle Profiles** — Select which profiles to cycle through
 - **Hardware Pins** — Arduino pin assignments
+
+Right-click any button to configure its physical pin assignment.
 
 ---
 

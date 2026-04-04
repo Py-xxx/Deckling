@@ -1,5 +1,5 @@
 // ============================================================
-//  StreamDeck – Arduino firmware
+//  Deckling – Arduino firmware
 //  Potentiometers + button matrix → Serial (115200 baud)
 // ============================================================
 

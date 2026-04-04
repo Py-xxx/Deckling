@@ -250,11 +250,37 @@ pub fn shutdown() {
 
 /// Convert raw ADC value (0-1023) to dB gain (-60 to +12)
 /// The pot is inverted: 0 = max, 1023 = min
-pub fn raw_to_gain_db(raw: u16) -> f32 {
+/// 
+/// # Arguments
+/// * `raw` - Raw ADC value (0-1023)
+/// * `pot_ohms` - Potentiometer resistance in ohms (affects curve)
+pub fn raw_to_gain_db_with_curve(raw: u16, pot_ohms: u32) -> f32 {
     let raw = raw.clamp(0, 1023) as f32;
-    // Inverted: 1023 - raw
-    // Map 0-1023 to -60..+12 (72 dB range)
-    ((1023.0 - raw) / 1023.0) * 72.0 - 60.0
+    // Inverted: 1023 - raw gives us 0 at pot min, 1023 at pot max
+    let normalized = (1023.0 - raw) / 1023.0;
+    
+    // Apply curve based on pot resistance
+    // Higher ohm pots tend to have more logarithmic taper
+    // We use a power curve: lower exponent = more linear, higher = more log-like
+    let curve_factor = match pot_ohms {
+        0..=2000 => 1.0,       // 1kΩ: linear
+        2001..=7500 => 1.2,    // 5kΩ: slight curve
+        7501..=25000 => 1.0,   // 10kΩ: linear (reference)
+        25001..=75000 => 0.85, // 50kΩ: slight anti-log
+        _ => 0.7,              // 100kΩ+: more anti-log
+    };
+    
+    let curved = normalized.powf(curve_factor);
+    
+    // Map 0-1 to -60..+12 (72 dB range)
+    curved * 72.0 - 60.0
+}
+
+/// Convert raw ADC value (0-1023) to dB gain (-60 to +12)
+/// The pot is inverted: 0 = max, 1023 = min
+/// Uses default 10kΩ linear mapping
+pub fn raw_to_gain_db(raw: u16) -> f32 {
+    raw_to_gain_db_with_curve(raw, 10000)
 }
 
 #[cfg(test)]
@@ -272,5 +298,19 @@ mod tests {
         // Middle
         let mid = raw_to_gain_db(511);
         assert!(mid > -30.0 && mid < -20.0);
+    }
+
+    #[test]
+    fn test_raw_to_gain_with_curve() {
+        // 10kΩ should be linear (same as default)
+        let linear = raw_to_gain_db_with_curve(512, 10000);
+        let default = raw_to_gain_db(512);
+        assert!((linear - default).abs() < 0.01);
+        
+        // Extremes should be the same regardless of curve
+        assert!((raw_to_gain_db_with_curve(0, 1000) - 12.0).abs() < 0.1);
+        assert!((raw_to_gain_db_with_curve(1023, 1000) - (-60.0)).abs() < 0.1);
+        assert!((raw_to_gain_db_with_curve(0, 100000) - 12.0).abs() < 0.1);
+        assert!((raw_to_gain_db_with_curve(1023, 100000) - (-60.0)).abs() < 0.1);
     }
 }

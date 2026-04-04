@@ -229,6 +229,14 @@ export default function AdvancedSettings({
     });
   };
 
+  // Pot ohms
+  const handlePotOhms = (value: number) => {
+    updateConfig((prev) => ({
+      ...prev,
+      hardware: { ...prev.hardware, pot_ohms: value },
+    }));
+  };
+
   const { grid_rows, grid_cols } = config.display;
   const total = grid_rows * grid_cols;
   const toggleId = config.profile_toggle.button_id;
@@ -329,7 +337,7 @@ export default function AdvancedSettings({
                 checked={launchOnStartup}
                 onChange={(e) => handleLaunchOnStartupChange(e.target.checked)}
               />
-              Launch StreamDeck when Windows starts
+              Launch Deckling when Windows starts
             </label>
           </div>
 
@@ -452,7 +460,65 @@ export default function AdvancedSettings({
             )}
           </div>
 
-          {/* 8. Hardware Pins */}
+          {/* 8. Cycle Profiles */}
+          <div className="settings-group">
+            <label>Cycle Profiles</label>
+            <span className="settings-helper">Select which profiles to cycle through (if none selected, cycles all)</span>
+            <div className="profile-cycle-list">
+              {Object.keys(config.profiles).map((profileName) => {
+                const cycleProfiles = config.profile_toggle.cycle_profiles || [];
+                const isSelected = cycleProfiles.length === 0 || cycleProfiles.includes(profileName);
+                const isExplicitlySelected = cycleProfiles.includes(profileName);
+                
+                return (
+                  <label key={profileName} className="profile-cycle-item">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => {
+                        updateConfig((prev) => {
+                          const current = prev.profile_toggle.cycle_profiles || [];
+                          let next: string[];
+                          
+                          if (current.length === 0) {
+                            // First explicit selection: include all except unchecked one
+                            const allProfiles = Object.keys(prev.profiles);
+                            if (e.target.checked) {
+                              next = [profileName];
+                            } else {
+                              next = allProfiles.filter(p => p !== profileName);
+                            }
+                          } else if (e.target.checked) {
+                            next = [...current, profileName];
+                          } else {
+                            next = current.filter(p => p !== profileName);
+                            // If only one left, keep empty to mean "all"
+                            if (next.length <= 1) next = [];
+                          }
+                          
+                          return {
+                            ...prev,
+                            profile_toggle: {
+                              ...prev.profile_toggle,
+                              cycle_profiles: next,
+                            },
+                          };
+                        });
+                      }}
+                    />
+                    <span className={`profile-name ${config.active_profile === profileName ? "active" : ""}`}>
+                      {profileName}
+                    </span>
+                    {!isExplicitlySelected && cycleProfiles.length === 0 && (
+                      <span className="all-hint">(all)</span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 9. Hardware Pins */}
           <div className="settings-group">
             <label>Hardware Pins</label>
             <div className="settings-group">
@@ -485,9 +551,24 @@ export default function AdvancedSettings({
                 onChange={(e) => handlePotPins(e.target.value)}
               />
             </div>
+            <div className="settings-group" style={{ marginTop: 8 }}>
+              <label>Potentiometer Resistance</label>
+              <select
+                className="settings-input"
+                value={config.hardware.pot_ohms || 10000}
+                onChange={(e) => handlePotOhms(parseInt(e.target.value, 10))}
+              >
+                <option value={1000}>1kΩ</option>
+                <option value={5000}>5kΩ</option>
+                <option value={10000}>10kΩ (default)</option>
+                <option value={50000}>50kΩ</option>
+                <option value={100000}>100kΩ</option>
+              </select>
+              <span className="settings-helper">Resistance value of your potentiometers</span>
+            </div>
           </div>
 
-          {/* 9. Config File */}
+          {/* 10. Config File */}
           <div className="settings-group">
             <label>Config File</label>
             <div className="config-path">{configPath || "Resolving…"}</div>

@@ -20,27 +20,44 @@ export const DEFAULT_CONFIG: AppConfig = {
     row_pins: [2, 3, 4],
     col_pins: [5, 6, 7, 8],
     pot_pins: [0, 1, 2, 3],
+    // Default: sequential mapping (button 0 = row0/col0, button 1 = row0/col1, etc.)
+    button_pins: {
+      "0": { row_pin: 2, col_pin: 5 },
+      "1": { row_pin: 2, col_pin: 6 },
+      "2": { row_pin: 2, col_pin: 7 },
+      "3": { row_pin: 2, col_pin: 8 },
+      "4": { row_pin: 3, col_pin: 5 },
+      "5": { row_pin: 3, col_pin: 6 },
+      "6": { row_pin: 3, col_pin: 7 },
+      "7": { row_pin: 3, col_pin: 8 },
+      "8": { row_pin: 4, col_pin: 5 },
+      "9": { row_pin: 4, col_pin: 6 },
+      "10": { row_pin: 4, col_pin: 7 },
+      "11": { row_pin: 4, col_pin: 8 },
+    },
+    pot_ohms: 10000, // 10kΩ default
   },
   profile_toggle: {
     button_id: -1,
     mode: "hold",
     hold_ms: 500,
+    cycle_profiles: [], // Empty = cycle all profiles
   },
   profiles: {
     Default: {
       buttons: {
-        "0": { label: "Mute Mic", action: "ctrl+alt+m" },
-        "1": { label: "Screenshot", action: "ctrl+shift+s" },
-        "2": { label: "Alt+Tab", action: "alt+tab" },
-        "3": { label: "Copy", action: "ctrl+c" },
-        "4": { label: "Paste", action: "ctrl+v" },
-        "5": { label: "Vol Up", action: "volumeup" },
-        "6": { label: "Vol Down", action: "volumedown" },
-        "7": { label: "Play/Pause", action: "playpause" },
-        "8": { label: "Next", action: "medianexttrack" },
-        "9": { label: "Prev", action: "mediaprevtrack" },
-        "10": { label: "Desktop", action: "win+d" },
-        "11": { label: "Explorer", action: "win+e" },
+        "0": { label: "Mute Mic", action: "ctrl+alt+m", action_type: "keyboard" },
+        "1": { label: "Screenshot", action: "ctrl+shift+s", action_type: "keyboard" },
+        "2": { label: "Alt+Tab", action: "alt+tab", action_type: "keyboard" },
+        "3": { label: "Copy", action: "ctrl+c", action_type: "keyboard" },
+        "4": { label: "Paste", action: "ctrl+v", action_type: "keyboard" },
+        "5": { label: "Vol Up", action: "volumeup", action_type: "multimedia" },
+        "6": { label: "Vol Down", action: "volumedown", action_type: "multimedia" },
+        "7": { label: "Play/Pause", action: "playpause", action_type: "multimedia" },
+        "8": { label: "Next", action: "medianexttrack", action_type: "multimedia" },
+        "9": { label: "Prev", action: "mediaprevtrack", action_type: "multimedia" },
+        "10": { label: "Desktop", action: "win+d", action_type: "keyboard" },
+        "11": { label: "Explorer", action: "win+e", action_type: "keyboard" },
       },
       pots: {
         "0": { label: "HW Input 1", strip: 0 },
@@ -54,18 +71,18 @@ export const DEFAULT_CONFIG: AppConfig = {
   launch_on_startup: false,
 };
 
-async function getStreamdeckDir(): Promise<string> {
+async function getDecklingDir(): Promise<string> {
   const home = await homeDir();
-  return await join(home, ".streamdeck");
+  return await join(home, ".deckling");
 }
 
 export async function getConfigPath(): Promise<string> {
-  const dir = await getStreamdeckDir();
+  const dir = await getDecklingDir();
   return await join(dir, "config.json");
 }
 
 export async function loadConfig(): Promise<AppConfig> {
-  const dir = await getStreamdeckDir();
+  const dir = await getDecklingDir();
   const configPath = await join(dir, "config.json");
 
   // Ensure directory exists
@@ -87,6 +104,31 @@ export async function loadConfig(): Promise<AppConfig> {
   // Ensure new fields have defaults
   if (parsed.auto_connect === undefined) parsed.auto_connect = true;
   if (parsed.launch_on_startup === undefined) parsed.launch_on_startup = false;
+  if (parsed.profile_toggle.cycle_profiles === undefined) parsed.profile_toggle.cycle_profiles = [];
+  
+  // Initialize button_pins if missing (generate default mapping)
+  if (!parsed.hardware.button_pins) {
+    const buttonPins: Record<string, { row_pin: number; col_pin: number }> = {};
+    const { row_pins, col_pins } = parsed.hardware;
+    const total = parsed.display.grid_rows * parsed.display.grid_cols;
+    
+    for (let i = 0; i < total; i++) {
+      const rowIdx = Math.floor(i / col_pins.length);
+      const colIdx = i % col_pins.length;
+      if (row_pins[rowIdx] !== undefined && col_pins[colIdx] !== undefined) {
+        buttonPins[String(i)] = {
+          row_pin: row_pins[rowIdx],
+          col_pin: col_pins[colIdx],
+        };
+      }
+    }
+    parsed.hardware.button_pins = buttonPins;
+  }
+  
+  // Initialize pot_ohms if missing
+  if (parsed.hardware.pot_ohms === undefined) {
+    parsed.hardware.pot_ohms = 10000; // 10kΩ default
+  }
   
   return parsed;
 }
@@ -145,4 +187,12 @@ export async function getLaunchOnStartup(): Promise<boolean> {
 
 export async function setLaunchOnStartup(enabled: boolean): Promise<void> {
   await invoke("set_launch_on_startup", { enabled });
+}
+
+// ============================================================================
+// File picker
+// ============================================================================
+
+export async function pickExecutable(): Promise<string | null> {
+  return await invoke<string | null>("pick_executable");
 }

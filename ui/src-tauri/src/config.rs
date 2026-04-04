@@ -12,6 +12,8 @@ use std::path::PathBuf;
 pub struct ButtonConfig {
     pub label: String,
     pub action: String,
+    #[serde(default)]
+    pub action_type: Option<String>, // "keyboard", "mouse", "multimedia", "launch"
 }
 
 /// Potentiometer configuration
@@ -34,6 +36,8 @@ pub struct ProfileToggle {
     pub button_id: i8, // -1 = disabled
     pub mode: String,  // "hold" or "tap"
     pub hold_ms: u32,
+    #[serde(default)]
+    pub cycle_profiles: Vec<String>, // Empty = cycle all
 }
 
 impl Default for ProfileToggle {
@@ -42,6 +46,7 @@ impl Default for ProfileToggle {
             button_id: -1,
             mode: "hold".into(),
             hold_ms: 500,
+            cycle_profiles: Vec::new(),
         }
     }
 }
@@ -64,20 +69,54 @@ impl Default for Display {
     }
 }
 
+/// Button pin mapping (row_pin, col_pin)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ButtonPinMapping {
+    pub row_pin: u8,
+    pub col_pin: u8,
+}
+
 /// Hardware pin configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Hardware {
     pub row_pins: Vec<u8>,
     pub col_pins: Vec<u8>,
     pub pot_pins: Vec<u8>,
+    #[serde(default)]
+    pub button_pins: HashMap<String, ButtonPinMapping>,
+    /// Potentiometer resistance in ohms (affects response curve)
+    /// Common values: 1000 (1kΩ), 5000 (5kΩ), 10000 (10kΩ), 50000 (50kΩ), 100000 (100kΩ)
+    #[serde(default = "default_pot_ohms")]
+    pub pot_ohms: u32,
+}
+
+fn default_pot_ohms() -> u32 {
+    10000 // 10kΩ default
 }
 
 impl Default for Hardware {
     fn default() -> Self {
+        let mut button_pins = HashMap::new();
+        // Default sequential mapping for 3x4 grid
+        let row_pins = vec![2, 3, 4];
+        let col_pins = vec![5, 6, 7, 8];
+        
+        for (ri, &rp) in row_pins.iter().enumerate() {
+            for (ci, &cp) in col_pins.iter().enumerate() {
+                let btn_id = ri * col_pins.len() + ci;
+                button_pins.insert(
+                    btn_id.to_string(),
+                    ButtonPinMapping { row_pin: rp, col_pin: cp },
+                );
+            }
+        }
+        
         Self {
-            row_pins: vec![2, 3, 4],
-            col_pins: vec![5, 6, 7, 8],
+            row_pins,
+            col_pins,
             pot_pins: vec![0, 1, 2, 3],
+            button_pins,
+            pot_ohms: 10000, // 10kΩ default
         }
     }
 }
@@ -128,6 +167,7 @@ impl Default for AppConfig {
                 ButtonConfig {
                     label: label.into(),
                     action: action.into(),
+                    action_type: None,
                 },
             );
         }
@@ -169,7 +209,7 @@ impl Default for AppConfig {
 pub fn config_dir() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join(".streamdeck")
+        .join(".deckling")
 }
 
 /// Get the config file path

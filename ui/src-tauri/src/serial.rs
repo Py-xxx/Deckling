@@ -7,7 +7,7 @@
 
 use parking_lot::Mutex;
 use serialport::{SerialPort, SerialPortInfo, SerialPortType};
-use std::io::{BufRead, BufReader};
+use std::io::Read;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
@@ -129,28 +129,46 @@ impl SerialManager {
 
     /// Reader loop that runs in a background thread
     fn reader_loop(
-        port: Box<dyn SerialPort>,
+        mut port: Box<dyn SerialPort>,
         state: Arc<Mutex<ConnectionState>>,
         running: Arc<AtomicBool>,
         callback: Arc<Mutex<Option<MessageCallback>>>,
         port_name: String,
     ) {
-        let mut reader = BufReader::new(port);
-        let mut line = String::new();
+        let mut buffer = [0u8; 256];
+        let mut line_buffer = Vec::with_capacity(64);
 
         while running.load(Ordering::SeqCst) {
-            line.clear();
-            match reader.read_line(&mut line) {
+            match port.read(&mut buffer) {
                 Ok(0) => {
                     // EOF - port disconnected
                     *state.lock() = ConnectionState::Error("Port disconnected".into());
                     break;
                 }
-                Ok(_) => {
-                    if let Some(msg) = parse_message(&line) {
-                        if let Some(ref cb) = *callback.lock() {
-                            cb(msg);
+                Ok(n) => {
+                    // Process bytes, looking for newlines
+                    for &byte in &buffer[..n] {
+                        if byte == b'\n' || byte == b'\r' {
+                            if !line_buffer.is_empty() {
+                                // Try to parse as UTF-8, skip invalid data
+                                if let Ok(line) = String::from_utf8(line_buffer.clone()) {
+                                    if let Some(msg) = parse_message(&line) {
+                                        if let Some(ref cb) = *callback.lock() {
+                                            cb(msg);
+                                        }
+                                    }
+                                }
+                                line_buffer.clear();
+                            }
+                        } else if byte.is_ascii() && !byte.is_ascii_control() {
+                            // Only accept printable ASCII characters
+                            line_buffer.push(byte);
+                            // Prevent buffer overflow from garbage data
+                            if line_buffer.len() > 32 {
+                                line_buffer.clear();
+                            }
                         }
+                        // Silently ignore non-ASCII and control chars (except newline)
                     }
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::TimedOut => {

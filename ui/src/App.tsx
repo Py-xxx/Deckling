@@ -5,11 +5,13 @@ import ProfileBar from "./components/ProfileBar";
 import ButtonGrid from "./components/ButtonGrid";
 import PotRow from "./components/PotRow";
 import KeybindModal from "./components/KeybindModal";
+import PinEditModal from "./components/PinEditModal";
 import AdvancedSettings from "./components/AdvancedSettings";
 
 export default function App() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [modalButtonId, setModalButtonId] = useState<number | null>(null);
+  const [pinEditButtonId, setPinEditButtonId] = useState<number | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [configPath, setConfigPath] = useState<string>("");
 
@@ -83,8 +85,8 @@ export default function App() {
     <div className="app">
       {/* Top bar */}
       <div className="topbar">
-        <span className="topbar-title">StreamDeck</span>
-        <span className="topbar-hint">config auto-saves</span>
+        <span className="topbar-title">Deckling</span>
+        <span className="topbar-hint">config auto-saves • right-click buttons to edit pins</span>
       </div>
 
       {/* Profile bar */}
@@ -98,6 +100,7 @@ export default function App() {
             config={config}
             updateConfig={updateConfig}
             onButtonClick={(id) => setModalButtonId(id)}
+            onPinEditClick={(id) => setPinEditButtonId(id)}
           />
           <PotRow config={config} updateConfig={updateConfig} />
         </div>
@@ -119,6 +122,16 @@ export default function App() {
           config={config}
           updateConfig={updateConfig}
           onClose={() => setModalButtonId(null)}
+        />
+      )}
+
+      {/* Pin edit modal */}
+      {pinEditButtonId !== null && (
+        <PinEditModal
+          buttonId={pinEditButtonId}
+          config={config}
+          updateConfig={updateConfig}
+          onClose={() => setPinEditButtonId(null)}
         />
       )}
     </div>

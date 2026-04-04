@@ -1,14 +1,15 @@
-# StreamDeck
+# Deckling
 
-A custom StreamDeck controller with Arduino hardware and a Tauri desktop app for Windows.
+A custom macro pad controller with Arduino hardware and a Tauri desktop app for Windows.
 
 ## Features
 
-- **Button Matrix** — Configure keyboard shortcuts for physical buttons
+- **Button Matrix** — Configure keyboard shortcuts, mouse clicks, media keys, or app launchers
 - **Potentiometers** — Control Voicemeeter Banana strip gains
 - **Multiple Profiles** — Switch between different configurations
 - **Auto-Connect** — Automatically connect to Arduino on startup
 - **Launch on Startup** — Start with Windows
+- **Pin Mapping** — Assign physical buttons to UI positions
 
 ## Quick Start
 

@@ -1,6 +1,10 @@
+// Action types for buttons
+export type ActionType = "keyboard" | "mouse" | "multimedia" | "launch";
+
 export interface ButtonConfig {
   label: string;
   action: string;
+  action_type?: ActionType; // Optional for backwards compatibility
 }
 
 export interface PotConfig {
@@ -17,6 +21,7 @@ export interface ProfileToggle {
   button_id: number;
   mode: "hold" | "tap";
   hold_ms: number;
+  cycle_profiles: string[]; // Which profiles to cycle through
 }
 
 export interface Display {
@@ -25,10 +30,21 @@ export interface Display {
   num_pots: number;
 }
 
+// Pin assignment for a button (row_pin, col_pin)
+export interface ButtonPinMapping {
+  row_pin: number;
+  col_pin: number;
+}
+
 export interface Hardware {
   row_pins: number[];
   col_pins: number[];
   pot_pins: number[];
+  // Maps UI button position to (row_pin, col_pin) pair
+  // Key is button position (0, 1, 2...), value is pin pair
+  button_pins?: Record<string, ButtonPinMapping>;
+  // Potentiometer resistance in ohms (affects response curve)
+  pot_ohms?: number;
 }
 
 export interface AppConfig {

@@ -13,7 +13,7 @@ fn get_auto_launch() -> Result<auto_launch::AutoLaunch, String> {
         .ok_or("Invalid exe path")?;
     
     AutoLaunchBuilder::new()
-        .set_app_name("StreamDeck")
+        .set_app_name("Deckling")
         .set_app_path(exe_path_str)
         .set_use_launch_agent(false) // Use registry on Windows
         .build()

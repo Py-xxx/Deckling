@@ -1,18 +1,28 @@
-import type { AppConfig } from "../types";
+import type { AppConfig, ButtonPinMapping } from "../types";
 
 interface Props {
   config: AppConfig;
   updateConfig: (updater: (prev: AppConfig) => AppConfig) => void;
   onButtonClick: (buttonId: number) => void;
+  onPinEditClick?: (buttonId: number) => void;
 }
 
-export default function ButtonGrid({ config, onButtonClick }: Props) {
+export default function ButtonGrid({ config, onButtonClick, onPinEditClick }: Props) {
   const { grid_rows, grid_cols } = config.display;
   const total = grid_rows * grid_cols;
   const profile = config.profiles[config.active_profile];
   const toggleId = config.profile_toggle.button_id;
+  const buttonPins = config.hardware.button_pins || {};
 
   const cells = Array.from({ length: total }, (_, i) => i);
+
+  const getPinLabel = (id: number): string => {
+    const mapping = buttonPins[String(id)];
+    if (mapping) {
+      return `D${mapping.row_pin}-D${mapping.col_pin}`;
+    }
+    return "";
+  };
 
   return (
     <div
@@ -23,18 +33,40 @@ export default function ButtonGrid({ config, onButtonClick }: Props) {
         const binding = profile?.buttons[String(id)];
         const isToggle = id === toggleId;
         const isEmpty = !binding;
+        const pinLabel = getPinLabel(id);
 
         let classes = "btn-cell";
         if (isToggle) classes += " is-toggle";
         else if (binding?.action) classes += " has-action";
         if (isEmpty && !isToggle) classes += " btn-empty";
 
+        const handleClick = () => {
+          // Don't allow editing the profile toggle button
+          if (isToggle) return;
+          onButtonClick(id);
+        };
+
+        const handleRightClick = (e: React.MouseEvent) => {
+          e.preventDefault();
+          if (onPinEditClick) {
+            onPinEditClick(id);
+          }
+        };
+
         return (
           <div
             key={id}
             className={classes}
-            onClick={() => onButtonClick(id)}
-            title={binding ? `${binding.label} — ${binding.action}` : `Button ${id}`}
+            onClick={handleClick}
+            onContextMenu={handleRightClick}
+            style={isToggle ? { cursor: "default" } : undefined}
+            title={
+              isToggle
+                ? `Profile Toggle (${pinLabel})\nConfigured in Advanced Settings`
+                : binding
+                  ? `${binding.label} — ${binding.action}\nPins: ${pinLabel}\nRight-click to edit pins`
+                  : `Button ${id}\nPins: ${pinLabel}\nRight-click to edit pins`
+            }
           >
             <span className="btn-id">{id}</span>
 
@@ -53,6 +85,9 @@ export default function ButtonGrid({ config, onButtonClick }: Props) {
                 )}
               </>
             )}
+            
+            {/* Pin indicator */}
+            <span className="btn-pin-label">{pinLabel}</span>
           </div>
         );
       })}
