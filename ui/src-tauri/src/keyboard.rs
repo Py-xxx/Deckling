@@ -291,11 +291,15 @@ mod tests {
 /// 
 /// # Action format
 /// - `mute:0` - Toggle mute on strip 0
-/// - `mute:0,2,3` - Toggle mute on strips 0, 2, and 3
+/// - `mute:0,2,3` - Toggle mute on strips 0, 2, and 3 (reads state from first strip)
 /// - `solo:1` - Toggle solo on strip 1
 /// - `mono:2` - Toggle mono on strip 2
 /// - `A1:0` - Toggle A1 output on strip 0
-/// - `A2:3,4` - Toggle A2 output on strips 3 and 4
+/// - `A2:3,4` - Toggle A2 output on strips 3 and 4 (reads state from first strip)
+/// 
+/// When multiple strips are specified, the state is read from the FIRST strip,
+/// then the toggled value is applied to ALL strips. This ensures all strips
+/// end up in the same state and avoids issues with stale parameter values.
 #[cfg(windows)]
 fn execute_voicemeeter_action(action: &str) {
     use crate::voicemeeter;
@@ -319,19 +323,45 @@ fn execute_voicemeeter_action(action: &str) {
         return;
     }
 
-    // Execute action for each strip
+    // Read current state from the FIRST strip
+    let first_strip = strips[0];
+    let current_state = match command {
+        "mute" => voicemeeter::get_strip_mute(first_strip),
+        "solo" => voicemeeter::get_strip_solo(first_strip),
+        "mono" => voicemeeter::get_strip_mono(first_strip),
+        "A1" | "A2" | "A3" | "A4" | "A5" | "B1" | "B2" | "B3" => {
+            voicemeeter::get_strip_bus(first_strip, command)
+        }
+        _ => {
+            eprintln!("Unknown Voicemeeter command: {}", command);
+            return;
+        }
+    };
+
+    let current_state = match current_state {
+        Ok(state) => state,
+        Err(e) => {
+            eprintln!("Failed to read Voicemeeter state: {}", e);
+            return;
+        }
+    };
+
+    // Toggle the state
+    let new_state = !current_state;
+    
+    println!("Voicemeeter {}: current={}, new={}, strips={:?}", 
+             command, current_state, new_state, strips);
+
+    // Apply the new state to ALL strips
     for strip in strips {
         let result = match command {
-            "mute" => voicemeeter::toggle_strip_mute(strip),
-            "solo" => voicemeeter::toggle_strip_solo(strip),
-            "mono" => voicemeeter::toggle_strip_mono(strip),
+            "mute" => voicemeeter::set_strip_mute(strip, new_state),
+            "solo" => voicemeeter::set_strip_solo(strip, new_state),
+            "mono" => voicemeeter::set_strip_mono(strip, new_state),
             "A1" | "A2" | "A3" | "A4" | "A5" | "B1" | "B2" | "B3" => {
-                voicemeeter::toggle_strip_bus(strip, command)
+                voicemeeter::set_strip_bus(strip, command, new_state)
             }
-            _ => {
-                eprintln!("Unknown Voicemeeter command: {}", command);
-                continue;
-            }
+            _ => continue,
         };
 
         if let Err(e) = result {

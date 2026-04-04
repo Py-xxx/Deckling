@@ -197,109 +197,127 @@ impl Voicemeeter {
         }
     }
 
-    /// Toggle strip mute
-    pub fn toggle_strip_mute(&self, strip: u8) -> Result<(), VmError> {
+    /// Get a parameter value
+    fn get_parameter(&self, param_name: &str) -> Result<f32, VmError> {
         if !self.logged_in {
             return Err(VmError::NotLoggedIn);
         }
 
-        // Get current mute state
-        let param_get = format!("Strip[{}].Mute", strip);
-        let param_cstr = CString::new(param_get).unwrap();
-        let mut current_value: f32 = 0.0;
+        let param_cstr = CString::new(param_name).unwrap();
+        let mut value: f32 = 0.0;
 
-        // SAFETY: Calling FFI function with valid CString pointer
-        let result = unsafe { (self.get_param_float)(param_cstr.as_ptr(), &mut current_value) };
+        let result = unsafe { (self.get_param_float)(param_cstr.as_ptr(), &mut value) };
         
-        if result != 0 {
-            return Err(VmError::ParameterError(result));
+        if result == 0 {
+            Ok(value)
+        } else {
+            Err(VmError::ParameterError(result))
+        }
+    }
+
+    /// Set a parameter value
+    fn set_parameter(&self, param_name: &str, value: f32) -> Result<(), VmError> {
+        if !self.logged_in {
+            return Err(VmError::NotLoggedIn);
         }
 
-        // Toggle: 0.0 -> 1.0, 1.0 -> 0.0
-        let new_value = if current_value > 0.5 { 0.0 } else { 1.0 };
-        println!("Strip[{}].Mute: current={}, new={}", strip, current_value, new_value);
-        let result = unsafe { (self.set_param_float)(param_cstr.as_ptr(), new_value) };
+        let param_cstr = CString::new(param_name).unwrap();
+        let result = unsafe { (self.set_param_float)(param_cstr.as_ptr(), value) };
 
         if result == 0 {
             Ok(())
         } else {
             Err(VmError::ParameterError(result))
         }
+    }
+
+    /// Toggle strip mute
+    pub fn toggle_strip_mute(&self, strip: u8) -> Result<(), VmError> {
+        let param = format!("Strip[{}].Mute", strip);
+        let current_value = self.get_parameter(&param)?;
+        let new_value = if current_value > 0.5 { 0.0 } else { 1.0 };
+        println!("Strip[{}].Mute: current={}, new={}", strip, current_value, new_value);
+        self.set_parameter(&param, new_value)
+    }
+
+    /// Set strip mute to a specific value
+    pub fn set_strip_mute(&self, strip: u8, muted: bool) -> Result<(), VmError> {
+        let param = format!("Strip[{}].Mute", strip);
+        let value = if muted { 1.0 } else { 0.0 };
+        self.set_parameter(&param, value)
+    }
+
+    /// Get strip mute state
+    pub fn get_strip_mute(&self, strip: u8) -> Result<bool, VmError> {
+        let param = format!("Strip[{}].Mute", strip);
+        let value = self.get_parameter(&param)?;
+        Ok(value > 0.5)
     }
 
     /// Toggle strip solo
     pub fn toggle_strip_solo(&self, strip: u8) -> Result<(), VmError> {
-        if !self.logged_in {
-            return Err(VmError::NotLoggedIn);
-        }
-
         let param = format!("Strip[{}].Solo", strip);
-        let param_cstr = CString::new(param).unwrap();
-        let mut current_value: f32 = 0.0;
-
-        let result = unsafe { (self.get_param_float)(param_cstr.as_ptr(), &mut current_value) };
-        if result != 0 {
-            return Err(VmError::ParameterError(result));
-        }
-
+        let current_value = self.get_parameter(&param)?;
         let new_value = if current_value > 0.5 { 0.0 } else { 1.0 };
-        let result = unsafe { (self.set_param_float)(param_cstr.as_ptr(), new_value) };
+        self.set_parameter(&param, new_value)
+    }
 
-        if result == 0 {
-            Ok(())
-        } else {
-            Err(VmError::ParameterError(result))
-        }
+    /// Set strip solo to a specific value
+    pub fn set_strip_solo(&self, strip: u8, solo: bool) -> Result<(), VmError> {
+        let param = format!("Strip[{}].Solo", strip);
+        let value = if solo { 1.0 } else { 0.0 };
+        self.set_parameter(&param, value)
+    }
+
+    /// Get strip solo state
+    pub fn get_strip_solo(&self, strip: u8) -> Result<bool, VmError> {
+        let param = format!("Strip[{}].Solo", strip);
+        let value = self.get_parameter(&param)?;
+        Ok(value > 0.5)
     }
 
     /// Toggle strip mono
     pub fn toggle_strip_mono(&self, strip: u8) -> Result<(), VmError> {
-        if !self.logged_in {
-            return Err(VmError::NotLoggedIn);
-        }
-
         let param = format!("Strip[{}].Mono", strip);
-        let param_cstr = CString::new(param).unwrap();
-        let mut current_value: f32 = 0.0;
-
-        let result = unsafe { (self.get_param_float)(param_cstr.as_ptr(), &mut current_value) };
-        if result != 0 {
-            return Err(VmError::ParameterError(result));
-        }
-
+        let current_value = self.get_parameter(&param)?;
         let new_value = if current_value > 0.5 { 0.0 } else { 1.0 };
-        let result = unsafe { (self.set_param_float)(param_cstr.as_ptr(), new_value) };
+        self.set_parameter(&param, new_value)
+    }
 
-        if result == 0 {
-            Ok(())
-        } else {
-            Err(VmError::ParameterError(result))
-        }
+    /// Set strip mono to a specific value
+    pub fn set_strip_mono(&self, strip: u8, mono: bool) -> Result<(), VmError> {
+        let param = format!("Strip[{}].Mono", strip);
+        let value = if mono { 1.0 } else { 0.0 };
+        self.set_parameter(&param, value)
+    }
+
+    /// Get strip mono state
+    pub fn get_strip_mono(&self, strip: u8) -> Result<bool, VmError> {
+        let param = format!("Strip[{}].Mono", strip);
+        let value = self.get_parameter(&param)?;
+        Ok(value > 0.5)
     }
 
     /// Toggle strip bus routing (A1, A2, A3, A4, A5, B1, B2, B3)
     pub fn toggle_strip_bus(&self, strip: u8, bus: &str) -> Result<(), VmError> {
-        if !self.logged_in {
-            return Err(VmError::NotLoggedIn);
-        }
-
         let param = format!("Strip[{}].{}", strip, bus);
-        let param_cstr = CString::new(param).unwrap();
-        let mut current_value: f32 = 0.0;
-
-        let result = unsafe { (self.get_param_float)(param_cstr.as_ptr(), &mut current_value) };
-        if result != 0 {
-            return Err(VmError::ParameterError(result));
-        }
-
+        let current_value = self.get_parameter(&param)?;
         let new_value = if current_value > 0.5 { 0.0 } else { 1.0 };
-        let result = unsafe { (self.set_param_float)(param_cstr.as_ptr(), new_value) };
+        self.set_parameter(&param, new_value)
+    }
 
-        if result == 0 {
-            Ok(())
-        } else {
-            Err(VmError::ParameterError(result))
-        }
+    /// Set strip bus routing to a specific value
+    pub fn set_strip_bus(&self, strip: u8, bus: &str, enabled: bool) -> Result<(), VmError> {
+        let param = format!("Strip[{}].{}", strip, bus);
+        let value = if enabled { 1.0 } else { 0.0 };
+        self.set_parameter(&param, value)
+    }
+
+    /// Get strip bus routing state
+    pub fn get_strip_bus(&self, strip: u8, bus: &str) -> Result<bool, VmError> {
+        let param = format!("Strip[{}].{}", strip, bus);
+        let value = self.get_parameter(&param)?;
+        Ok(value > 0.5)
     }
 }
 
@@ -489,6 +507,86 @@ pub fn toggle_strip_bus(strip: u8, bus: &str) -> Result<(), VmError> {
     let vm = vm_opt.lock();
     match vm.as_ref() {
         Some(voicemeeter) => voicemeeter.toggle_strip_bus(strip, bus),
+        None => Err(VmError::NotLoggedIn),
+    }
+}
+
+/// Get strip mute state
+pub fn get_strip_mute(strip: u8) -> Result<bool, VmError> {
+    let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
+    let vm = vm_opt.lock();
+    match vm.as_ref() {
+        Some(voicemeeter) => voicemeeter.get_strip_mute(strip),
+        None => Err(VmError::NotLoggedIn),
+    }
+}
+
+/// Set strip mute
+pub fn set_strip_mute(strip: u8, muted: bool) -> Result<(), VmError> {
+    let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
+    let vm = vm_opt.lock();
+    match vm.as_ref() {
+        Some(voicemeeter) => voicemeeter.set_strip_mute(strip, muted),
+        None => Err(VmError::NotLoggedIn),
+    }
+}
+
+/// Get strip solo state
+pub fn get_strip_solo(strip: u8) -> Result<bool, VmError> {
+    let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
+    let vm = vm_opt.lock();
+    match vm.as_ref() {
+        Some(voicemeeter) => voicemeeter.get_strip_solo(strip),
+        None => Err(VmError::NotLoggedIn),
+    }
+}
+
+/// Set strip solo
+pub fn set_strip_solo(strip: u8, solo: bool) -> Result<(), VmError> {
+    let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
+    let vm = vm_opt.lock();
+    match vm.as_ref() {
+        Some(voicemeeter) => voicemeeter.set_strip_solo(strip, solo),
+        None => Err(VmError::NotLoggedIn),
+    }
+}
+
+/// Get strip mono state
+pub fn get_strip_mono(strip: u8) -> Result<bool, VmError> {
+    let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
+    let vm = vm_opt.lock();
+    match vm.as_ref() {
+        Some(voicemeeter) => voicemeeter.get_strip_mono(strip),
+        None => Err(VmError::NotLoggedIn),
+    }
+}
+
+/// Set strip mono
+pub fn set_strip_mono(strip: u8, mono: bool) -> Result<(), VmError> {
+    let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
+    let vm = vm_opt.lock();
+    match vm.as_ref() {
+        Some(voicemeeter) => voicemeeter.set_strip_mono(strip, mono),
+        None => Err(VmError::NotLoggedIn),
+    }
+}
+
+/// Get strip bus state
+pub fn get_strip_bus(strip: u8, bus: &str) -> Result<bool, VmError> {
+    let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
+    let vm = vm_opt.lock();
+    match vm.as_ref() {
+        Some(voicemeeter) => voicemeeter.get_strip_bus(strip, bus),
+        None => Err(VmError::NotLoggedIn),
+    }
+}
+
+/// Set strip bus
+pub fn set_strip_bus(strip: u8, bus: &str, enabled: bool) -> Result<(), VmError> {
+    let vm_opt = VOICEMEETER.get_or_init(|| Mutex::new(None));
+    let vm = vm_opt.lock();
+    match vm.as_ref() {
+        Some(voicemeeter) => voicemeeter.set_strip_bus(strip, bus, enabled),
         None => Err(VmError::NotLoggedIn),
     }
 }
