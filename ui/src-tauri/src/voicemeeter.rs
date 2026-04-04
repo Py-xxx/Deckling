@@ -217,6 +217,7 @@ impl Voicemeeter {
 
         // Toggle: 0.0 -> 1.0, 1.0 -> 0.0
         let new_value = if current_value > 0.5 { 0.0 } else { 1.0 };
+        println!("Strip[{}].Mute: current={}, new={}", strip, current_value, new_value);
         let result = unsafe { (self.set_param_float)(param_cstr.as_ptr(), new_value) };
 
         if result == 0 {

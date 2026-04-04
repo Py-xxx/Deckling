@@ -291,10 +291,11 @@ mod tests {
 /// 
 /// # Action format
 /// - `mute:0` - Toggle mute on strip 0
+/// - `mute:0,2,3` - Toggle mute on strips 0, 2, and 3
 /// - `solo:1` - Toggle solo on strip 1
 /// - `mono:2` - Toggle mono on strip 2
 /// - `A1:0` - Toggle A1 output on strip 0
-/// - `A2:3` - Toggle A2 output on strip 3
+/// - `A2:3,4` - Toggle A2 output on strips 3 and 4
 #[cfg(windows)]
 fn execute_voicemeeter_action(action: &str) {
     use crate::voicemeeter;
@@ -306,29 +307,36 @@ fn execute_voicemeeter_action(action: &str) {
     }
 
     let command = parts[0];
-    let strip = match parts[1].parse::<u8>() {
-        Ok(s) => s,
-        Err(_) => {
-            eprintln!("Invalid strip number: {}", parts[1]);
-            return;
-        }
-    };
+    
+    // Parse comma-separated strip numbers
+    let strips: Vec<u8> = parts[1]
+        .split(',')
+        .filter_map(|s| s.trim().parse::<u8>().ok())
+        .collect();
+    
+    if strips.is_empty() {
+        eprintln!("No valid strip numbers found: {}", parts[1]);
+        return;
+    }
 
-    let result = match command {
-        "mute" => voicemeeter::toggle_strip_mute(strip),
-        "solo" => voicemeeter::toggle_strip_solo(strip),
-        "mono" => voicemeeter::toggle_strip_mono(strip),
-        "A1" | "A2" | "A3" | "A4" | "A5" | "B1" | "B2" | "B3" => {
-            voicemeeter::toggle_strip_bus(strip, command)
-        }
-        _ => {
-            eprintln!("Unknown Voicemeeter command: {}", command);
-            return;
-        }
-    };
+    // Execute action for each strip
+    for strip in strips {
+        let result = match command {
+            "mute" => voicemeeter::toggle_strip_mute(strip),
+            "solo" => voicemeeter::toggle_strip_solo(strip),
+            "mono" => voicemeeter::toggle_strip_mono(strip),
+            "A1" | "A2" | "A3" | "A4" | "A5" | "B1" | "B2" | "B3" => {
+                voicemeeter::toggle_strip_bus(strip, command)
+            }
+            _ => {
+                eprintln!("Unknown Voicemeeter command: {}", command);
+                continue;
+            }
+        };
 
-    if let Err(e) = result {
-        eprintln!("Voicemeeter action failed: {}", e);
+        if let Err(e) = result {
+            eprintln!("Voicemeeter action failed for strip {}: {}", strip, e);
+        }
     }
 }
 

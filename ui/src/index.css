@@ -1099,6 +1099,69 @@ select {
   flex: 1;
 }
 
+/* ── Voicemeeter Dropdown & Checklist ── */
+.vm-dropdown {
+  width: 100%;
+  padding: 12px 14px;
+  margin-top: 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.vm-dropdown:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}
+
+.vm-dropdown:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+
+.vm-strip-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.vm-strip-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface-raised);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.12s;
+  user-select: none;
+}
+
+.vm-strip-checkbox:hover {
+  background: var(--surface-hover);
+  border-color: var(--border);
+}
+
+.vm-strip-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.vm-strip-checkbox span {
+  font-size: 13px;
+  color: var(--text);
+}
+
 .keybind-modal .modal-actions {
   padding: 16px 20px;
   border-top: 1px solid var(--border);

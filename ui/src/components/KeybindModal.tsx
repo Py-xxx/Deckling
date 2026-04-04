@@ -125,7 +125,12 @@ export default function KeybindModal({ buttonId, config, updateConfig, onClose }
     ? existing.action.substring(12).split(":")
     : null;
   const [vmAction, setVmAction] = useState<string>(parsedVm?.[0] ?? "mute");
-  const [vmStrip, setVmStrip] = useState<number>(parsedVm?.[1] ? parseInt(parsedVm[1]) : 0);
+  // Support comma-separated strips like "0,2,3"
+  const [vmStrips, setVmStrips] = useState<number[]>(
+    parsedVm?.[1] 
+      ? parsedVm[1].split(",").map(s => parseInt(s.trim())).filter(n => !isNaN(n))
+      : [0]
+  );
 
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -174,9 +179,9 @@ export default function KeybindModal({ buttonId, config, updateConfig, onClose }
     const finalLabel = labelText.trim() || getDefaultLabel();
     let finalAction = capturedAction.trim();
     
-    // Build voicemeeter action string
+    // Build voicemeeter action string (comma-separated strips)
     if (activeCategory === "voicemeeter") {
-      finalAction = `voicemeeter:${vmAction}:${vmStrip}`;
+      finalAction = `voicemeeter:${vmAction}:${vmStrips.join(",")}`;
     }
 
     updateConfig((prev) => {
@@ -204,9 +209,14 @@ export default function KeybindModal({ buttonId, config, updateConfig, onClose }
 
   const getDefaultLabel = () => {
     if (activeCategory === "voicemeeter") {
-      const stripLabel = VM_STRIPS.find((s) => s.value === vmStrip)?.label ?? `Strip ${vmStrip}`;
       const actionLabel = VM_ACTIONS.find((a) => a.value === vmAction)?.label ?? vmAction;
-      return `${actionLabel} ${stripLabel}`;
+      if (vmStrips.length === 1) {
+        const stripLabel = VM_STRIPS.find((s) => s.value === vmStrips[0])?.label ?? `Strip ${vmStrips[0]}`;
+        return `${actionLabel} ${stripLabel}`;
+      } else {
+        const stripLabels = vmStrips.map(s => VM_STRIPS.find((st) => st.value === s)?.label ?? `${s}`).join(", ");
+        return `${actionLabel} [${stripLabels}]`;
+      }
     }
     if (activeCategory === "mouse") {
       return MOUSE_OPTIONS.find((o) => o.value === capturedAction)?.label ?? "Mouse";
@@ -344,27 +354,35 @@ export default function KeybindModal({ buttonId, config, updateConfig, onClose }
         return (
           <>
             <div className="modal-section-label">Action</div>
-            <div className="keybind-option-list">
+            <select 
+              className="vm-dropdown"
+              value={vmAction}
+              onChange={(e) => setVmAction(e.target.value)}
+            >
               {VM_ACTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  className={`keybind-option ${vmAction === opt.value ? "selected" : ""}`}
-                  onClick={() => setVmAction(opt.value)}
-                >
+                <option key={opt.value} value={opt.value}>
                   {opt.label}
-                </button>
+                </option>
               ))}
-            </div>
-            <div className="modal-section-label" style={{ marginTop: 16 }}>Strip</div>
-            <div className="keybind-option-list">
+            </select>
+            
+            <div className="modal-section-label" style={{ marginTop: 16 }}>Strips (select one or more)</div>
+            <div className="vm-strip-checklist">
               {VM_STRIPS.map((opt) => (
-                <button
-                  key={opt.value}
-                  className={`keybind-option ${vmStrip === opt.value ? "selected" : ""}`}
-                  onClick={() => setVmStrip(opt.value)}
-                >
-                  {opt.label}
-                </button>
+                <label key={opt.value} className="vm-strip-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={vmStrips.includes(opt.value)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setVmStrips([...vmStrips, opt.value].sort((a, b) => a - b));
+                      } else {
+                        setVmStrips(vmStrips.filter(s => s !== opt.value));
+                      }
+                    }}
+                  />
+                  <span>{opt.label}</span>
+                </label>
               ))}
             </div>
           </>
