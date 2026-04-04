@@ -178,22 +178,23 @@ impl Daemon {
             return;
         }
 
-        // Apply invert if enabled
-        let raw = if config.hardware.invert_pots {
-            1023 - raw
-        } else {
-            raw
-        };
-
         // Convert to dB - use calibration if enabled, otherwise use default curve
+        // Note: When calibration is enabled, we use the raw value directly since
+        // calibration captures the actual pot range. invert_pots only applies
+        // to non-calibrated pots.
         let gain_db = if let Some(ref cal) = pot_cfg.calibration {
             if cal.enabled {
+                // Calibration uses raw values directly - it already knows the pot's direction
                 voicemeeter::raw_to_gain_db_calibrated(raw, cal.raw_min, cal.raw_max)
             } else {
-                voicemeeter::raw_to_gain_db_with_curve(raw, config.hardware.pot_ohms)
+                // Apply invert only for non-calibrated pots
+                let adjusted = if config.hardware.invert_pots { 1023 - raw } else { raw };
+                voicemeeter::raw_to_gain_db_with_curve(adjusted, config.hardware.pot_ohms)
             }
         } else {
-            voicemeeter::raw_to_gain_db_with_curve(raw, config.hardware.pot_ohms)
+            // Apply invert only for non-calibrated pots
+            let adjusted = if config.hardware.invert_pots { 1023 - raw } else { raw };
+            voicemeeter::raw_to_gain_db_with_curve(adjusted, config.hardware.pot_ohms)
         };
         let gain_int = gain_db.round() as i16;
 
