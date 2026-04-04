@@ -3,6 +3,7 @@
 //! Parses action strings like "ctrl+alt+m" and simulates the key combination.
 
 use enigo::{Direction, Enigo, Key, Keyboard, Mouse, Button, Settings};
+use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
